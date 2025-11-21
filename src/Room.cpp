@@ -132,10 +132,8 @@ bool Room::hasBeenVisited() const {
 
 // Update room (guards, puzzles, etc.)
 void Room::update(float deltaTime) {
-    // Update guards
-    for (auto& guard : guards) {
-        guard->update(deltaTime, *static_cast<Player*>(nullptr)); // Note: Will be fixed when integrated
-    }
+    // Note: Guards need player reference, this will be called from Game::updatePlaying()
+    // where it has access to the player
     
     // Update puzzles
     for (auto& puzzle : puzzles) {
@@ -148,6 +146,11 @@ void Room::draw(sf::RenderWindow& window) {
     // Draw background
     window.draw(background);
     
+    // Draw guards (with detection radius visible)
+    for (auto& guard : guards) {
+        guard->draw(window, true);  // true = show detection radius
+    }
+    
     // Draw doors
     for (auto& door : doors) {
         door->draw(window);
@@ -158,11 +161,6 @@ void Room::draw(sf::RenderWindow& window) {
         if (!item->isItemCollected()) {
             item->draw(window);
         }
-    }
-    
-    // Draw guards
-    for (auto& guard : guards) {
-        guard->draw(window);
     }
 }
 
@@ -209,7 +207,8 @@ bool Door::canOpen(const std::string& keyName) {
         return true;
     }
     
-    if (keyName == requiredKey) {
+    // Check if the key matches
+    if (keyName == requiredKey || requiredKey.empty()) {
         unlock();
         return true;
     }
