@@ -1,7 +1,3 @@
-// Item
-// Room
-// Puzzle
-
 #ifndef GAME_H
 #define GAME_H
 
@@ -39,7 +35,7 @@ private:
     std::unique_ptr<Timer> gameTimer;
     std::unique_ptr<Inventory> inventory;
 
-// Rooms
+    // Rooms
     std::map<int, std::shared_ptr<Room>> rooms;
     int currentRoomID;
     
@@ -92,7 +88,31 @@ private:
     void updatePlaying();
     void updatePuzzle();
     void updateGameOver();
-
     
+    void renderMenu();
+    void renderPlaying();
+    void renderPuzzle();
+    void renderGameOver();
+    void renderVictory();
+    
+    // Game mechanics
+    void changeRoom(int newRoomID);
+    void activatePuzzle(std::shared_ptr<Puzzle> puzzle);
+    void checkCollisions();
+    void checkGuardDetection();
+    void checkDoorInteraction();
+    void checkItemPickup();
+    void checkPuzzleInteraction();
+    
+    // Win/Lose conditions
+    void checkWinCondition();
+    void checkLoseCondition();
+    void setGameOver(bool victory);
+    
+    // Utility
+    void resetGame();
+    void pauseGame();
+    void resumeGame();
+    void showNotification(const std::string& message, const sf::Color& color, float duration = 3.0f);
 };
 #endif // GAME_H
