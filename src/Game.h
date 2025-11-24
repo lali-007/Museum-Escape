@@ -26,10 +26,10 @@ private:
     sf::RenderWindow window;
     sf::Clock clock;
     float deltaTime;
-    
+
     // Game state
     GameState currentState;
-    
+
     // Core components
     std::unique_ptr<Player> player;
     std::unique_ptr<Timer> gameTimer;
