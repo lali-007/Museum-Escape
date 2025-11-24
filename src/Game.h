@@ -92,5 +92,7 @@ private:
     void updatePlaying();
     void updatePuzzle();
     void updateGameOver();
+
+    
 };
 #endif // GAME_H
