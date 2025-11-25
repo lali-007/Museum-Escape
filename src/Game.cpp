@@ -416,3 +416,309 @@ void Game::updatePuzzle() {
 void Game::updateGameOver() {
     // Game over doesn't need updates
 }
+
+// Render everything
+void Game::render() {
+    window.clear(sf::Color(20, 20, 30));
+    
+    switch (currentState) {
+        case GameState::MENU:
+            renderMenu();
+            break;
+        case GameState::PLAYING:
+            renderPlaying();
+            break;
+        case GameState::PUZZLE_ACTIVE:
+            renderPuzzle();
+            break;
+        case GameState::GAME_OVER:
+            renderGameOver();
+            break;
+        case GameState::VICTORY:
+            renderVictory();
+            break;
+        default:
+            break;
+    }
+    
+    window.display();
+}
+
+void Game::renderMenu() {
+    stateText.setString("MUSEUM ESCAPE\n\nPress ENTER to Start\n\nControls:\nWASD = Move\nE = Pick items/doors\nP = Activate puzzles\nI = Inventory");
+    stateText.setCharacterSize(24);
+    stateText.setPosition({150.0f, 200.0f});
+    window.draw(stateText);
+}
+
+void Game::renderPlaying() {
+    // Draw current room
+    if (rooms.find(currentRoomID) != rooms.end()) {
+        rooms[currentRoomID]->draw(window);
+    }
+    
+    // Draw player
+    player->draw(window);
+    
+    // Draw timer
+    gameTimer->draw(window);
+    
+    // Draw inventory if visible
+    if (inventory->getVisible()) {
+        inventory->draw(window);
+    }
+    
+    // Draw notification if active (ALWAYS ON TOP)
+    if (notificationTimer > 0) {
+        notificationText.setString(currentNotification);
+        notificationText.setFillColor(notificationColor);
+        window.draw(notificationText);
+    }
+}
+
+void Game::renderPuzzle() {
+    // Draw dimmed game background
+    renderPlaying();
+    window.draw(overlay);
+    
+    // Draw active puzzle
+    if (activePuzzle) {
+        activePuzzle->display(window);
+    }
+}
+
+void Game::renderGameOver() {
+    window.draw(overlay);
+    stateText.setString("GAME OVER\n\nPress ESC to quit");
+    stateText.setCharacterSize(30);
+    stateText.setPosition({250.0f, 250.0f});
+    window.draw(stateText);
+}
+
+void Game::renderVictory() {
+    window.draw(overlay);
+    stateText.setString("YOU ESCAPED!\n\nPress ESC to quit");
+    stateText.setCharacterSize(30);
+    stateText.setPosition({230.0f, 250.0f});
+    window.draw(stateText);
+}
+
+// Change to a different room - SIMPLIFIED (spawn at default position)
+void Game::changeRoom(int newRoomID) {
+    if (rooms.find(newRoomID) != rooms.end()) {
+        currentRoomID = newRoomID;
+        rooms[currentRoomID]->setVisited(true);
+        
+        // Spawn player at a safe default position
+        player->setPosition(100.0f, 300.0f);
+        
+        std::cout << "\n→ Moved to: " << rooms[currentRoomID]->getRoomName() << std::endl;
+    }
+}
+
+// Activate a puzzle
+void Game::activatePuzzle(std::shared_ptr<Puzzle> puzzle) {
+    activePuzzle = puzzle;
+    currentState = GameState::PUZZLE_ACTIVE;
+    gameTimer->pause();
+    std::cout << "Puzzle activated! (Press ESC to exit without solving)" << std::endl;
+}
+
+// Check collisions with room boundaries
+void Game::checkCollisions() {
+    // Basic collision with room bounds
+    auto playerBounds = player->getBounds();
+    auto roomBounds = rooms[currentRoomID]->getBounds();
+    
+    // Keep player inside room (simple version)
+    sf::Vector2f pos = player->getPosition();
+    if (pos.x < 0) player->setPosition(0, pos.y);
+    if (pos.y < 0) player->setPosition(pos.x, 0);
+    if (pos.x > 800 - playerBounds.size.x) player->setPosition(800 - playerBounds.size.x, pos.y);
+    if (pos.y > 600 - playerBounds.size.y) player->setPosition(pos.x, 600 - playerBounds.size.y);
+}
+
+// Check if guards detect player
+void Game::checkGuardDetection() {
+    auto& guards = rooms[currentRoomID]->getGuards();
+    
+    for (auto& guard : guards) {
+        if (guard->detectPlayer(*player)) {
+            if (!player->isPlayerWarned()) {
+                player->warn();
+                showNotification("WARNING! Caught by guard!", sf::Color::Yellow, 3.0f);
+                std::cout << "⚠️  WARNING! Caught by guard! Don't get caught again!" << std::endl;
+                gameTimer->subtractTime(5.0f);
+            } else {
+                showNotification("CAUGHT! Game Over!", sf::Color::Red, 2.0f);
+                std::cout << "💀 CAUGHT AGAIN! GAME OVER!" << std::endl;
+                setGameOver(false);
+                return;
+            }
+        }
+    }
+}
+
+// Check door interactions
+void Game::checkDoorInteraction() {
+    auto& doors = rooms[currentRoomID]->getDoors();
+    auto playerBounds = player->getBounds();
+    
+    for (auto& door : doors) {
+        if (door->checkCollision(playerBounds)) {
+            if (door->getLockedStatus()) {
+                bool hasKey = false;
+                std::string requiredKey = "";
+                
+                int targetRoom = door->getTargetRoomID();
+                if (targetRoom == 3) {
+                    requiredKey = "Master Key";
+                } else if (targetRoom == 5) {
+                    requiredKey = "Security Card";
+                }
+                
+                auto& inv = player->getInventory();
+                for (auto* item : inv) {
+                    if (item->getName() == requiredKey) {
+                        hasKey = true;
+                        break;
+                    }
+                }
+                
+                if (hasKey) {
+                    door->unlock();
+                    showNotification("Door unlocked with " + requiredKey + "!", sf::Color::Green, 2.0f);
+                    std::cout << "🔓 Door unlocked with " << requiredKey << "!" << std::endl;
+                    changeRoom(door->getTargetRoomID());
+                } else {
+                    showNotification("LOCKED! Need " + requiredKey, sf::Color::Red, 2.0f);
+                    std::cout << "🔒 Door is LOCKED! You need: " << requiredKey << std::endl;
+                }
+            } else {
+                changeRoom(door->getTargetRoomID());
+            }
+            return;
+        }
+    }
+}
+
+// Check item pickup - FIXED: Longer notification for Secret Code
+void Game::checkItemPickup() {
+    auto& items = rooms[currentRoomID]->getItems();
+    auto playerBounds = player->getBounds();
+    
+    for (auto& item : items) {
+        if (!item->isItemCollected() && item->checkCollision(playerBounds)) {
+            item->collect();
+            player->addItem(item.get());
+            inventory->addItem(item);
+            
+            // Special handling for Secret Code - show for longer and pause hint
+            if (item->getName() == "Secret Code") {
+                Passcode* passcode = dynamic_cast<Passcode*>(item.get());
+                if (passcode) {
+                    std::string code = passcode->getCode();
+                    // Show for 10 seconds! Much longer than before
+                    showNotification("SECRET CODE: " + code + " - Remember this for Lock Puzzle!", sf::Color::Yellow, 10.0f);
+                    std::cout << "\n" << std::string(50, '=') << std::endl;
+                    std::cout << "📜 FOUND SECRET CODE: " << code << std::endl;
+                    std::cout << "💡 Write this down! You need it for Room 4 Lock Puzzle!" << std::endl;
+                    std::cout << std::string(50, '=') << "\n" << std::endl;
+                }
+            } else {
+                showNotification("Picked up: " + item->getName(), sf::Color::Cyan, 2.0f);
+                std::cout << "📦 Picked up: " << item->getName() << std::endl;
+            }
+        }
+    }
+}
+
+// Check puzzle interaction - FIXED: Better hint for Lock Puzzle
+void Game::checkPuzzleInteraction() {
+    auto& puzzles = rooms[currentRoomID]->getPuzzles();
+    
+    for (auto& puzzle : puzzles) {
+        if (!puzzle->isSolvedStatus()) {
+            activatePuzzle(puzzle);
+            
+            // Special hint for Lock Puzzle in Room 4
+            if (currentRoomID == 4) {
+                showNotification("Lock Puzzle! Enter code from Room 3 Secret Code item!", sf::Color::Magenta, 4.0f);
+                std::cout << "\n💡 HINT: Use the Secret Code you found in Room 3!" << std::endl;
+                std::cout << "💡 The code is 4 digits. Check your inventory if you forgot!\n" << std::endl;
+            } else {
+                showNotification("Puzzle activated! Press ESC to close", sf::Color::Magenta, 2.0f);
+            }
+            return;
+        }
+    }
+}
+
+// Check if player has won
+void Game::checkWinCondition() {
+    if (rooms[currentRoomID]->isExit()) {
+        bool allPuzzlesSolved = true;
+        
+        for (auto& roomPair : rooms) {
+            auto& puzzles = roomPair.second->getPuzzles();
+            for (auto& puzzle : puzzles) {
+                if (!puzzle->isSolvedStatus()) {
+                    allPuzzlesSolved = false;
+                    break;
+                }
+            }
+            if (!allPuzzlesSolved) break;
+        }
+        
+        if (allPuzzlesSolved) {
+            setGameOver(true);
+        } else {
+            showNotification("Solve ALL puzzles to escape!", sf::Color::Red, 2.0f);
+            std::cout << "❌ You must solve ALL puzzles first!" << std::endl;
+        }
+    }
+}
+
+// Check if player has lost
+void Game::checkLoseCondition() {
+    if (gameTimer->isExpired()) {
+        setGameOver(false);
+    }
+}
+
+// Set game over state
+void Game::setGameOver(bool victory) {
+    if (victory) {
+        currentState = GameState::VICTORY;
+        std::cout << "\n🎉 YOU ESCAPED! CONGRATULATIONS! 🎉" << std::endl;
+    } else {
+        currentState = GameState::GAME_OVER;
+        std::cout << "\n💀 GAME OVER! 💀" << std::endl;
+    }
+    gameTimer->stop();
+}
+
+// Pause the game
+void Game::pauseGame() {
+    currentState = GameState::PAUSED;
+    gameTimer->pause();
+}
+
+// Resume the game
+void Game::resumeGame() {
+    currentState = GameState::PLAYING;
+    gameTimer->resume();
+}
+
+// Reset game to initial state
+void Game::resetGame() {
+    currentState = GameState::MENU;
+    gameTimer->reset();
+}
+
+// Show notification on screen
+void Game::showNotification(const std::string& message, const sf::Color& color, float duration) {
+    currentNotification = message;
+    notificationColor = color;
+    notificationTimer = duration;
+}
