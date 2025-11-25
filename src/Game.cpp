@@ -1,9 +1,3 @@
-/*
- * Museum Escape - Game Class Implementation
- * CS/CE 224/272 - Fall 2025
- * ALL BUGS FIXED VERSION
- */
-
 #include "Game.h"
 #include "Puzzle.h"
 #include "Guard.h"
@@ -16,7 +10,8 @@ Game::Game()
       currentState(GameState::MENU),
       deltaTime(0.0f),
       currentRoomID(1),
-      activePuzzle(nullptr),      stateText(defaultFont),
+      activePuzzle(nullptr),
+      stateText(defaultFont),
       notificationText(notificationFont),
       notificationTimer(0.0f),
       notificationColor(sf::Color::White)
