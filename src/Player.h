@@ -11,15 +11,15 @@ class Room; // Forward declaration
 class Player {
 private:
     sf::Vector2f position;
-    sf::RectangleShape sprite;
+    sf::Sprite sprite; // CHANGED: Now a Sprite
     float speed;
     int health;
     bool isWarned; // True if caught by guard once
     std::vector<Item*> inventory;
     
 public:
-    // Constructor
-    Player(float x, float y);
+    // Constructor - CHANGED: Takes texture
+    Player(float x, float y, const sf::Texture& texture);
     
     // Movement
     void move(float dx, float dy);

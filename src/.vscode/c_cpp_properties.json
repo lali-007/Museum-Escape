@@ -1,0 +1,19 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "D:\\University\\Habib\\Sem 3\\OOP\\Lab\\SFML Files\\SFML-3.0.2-windows-gcc-14.2.0-mingw-64-bit\\include"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "windows-gcc-x64"
+        }
+    ],
+    "version": 4
+}

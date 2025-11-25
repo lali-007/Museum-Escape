@@ -26,15 +26,15 @@ private:
     sf::RenderWindow window;
     sf::Clock clock;
     float deltaTime;
-
+    
     // Game state
     GameState currentState;
-
+    
     // Core components
     std::unique_ptr<Player> player;
     std::unique_ptr<Timer> gameTimer;
     std::unique_ptr<Inventory> inventory;
-
+    
     // Rooms
     std::map<int, std::shared_ptr<Room>> rooms;
     int currentRoomID;
@@ -47,6 +47,10 @@ private:
     sf::Font defaultFont; // Default font for initialization
     sf::Font notificationFont; // Font for notifications
     sf::Music backgroundMusic;
+    
+    // --- NEW: Texture Assets ---
+    sf::Texture playerTexture;
+    sf::Texture guardTexture;
     
     // UI Elements (declared after fonts)
     sf::Text stateText; // Regular member, initialized in constructor
@@ -115,4 +119,5 @@ private:
     void resumeGame();
     void showNotification(const std::string& message, const sf::Color& color, float duration = 3.0f);
 };
+
 #endif // GAME_H
