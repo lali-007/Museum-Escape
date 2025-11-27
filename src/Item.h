@@ -62,6 +62,14 @@ public:
     std::string getCode() const;
 };
 
+// BasicItem - Simple collectible with no special use
+class BasicItem : public Item {
+public:
+    BasicItem(const std::string& itemName, const std::string& desc, float x, float y);
+    
+    void use() override; // Does nothing, just for collection
+};
+
 // Inventory class - Manages player's collected items
 class Inventory {
 private:
