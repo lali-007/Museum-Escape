@@ -1,4 +1,3 @@
-
 /*
  * Museum Escape - Player Class Implementation
  * CS/CE 224/272 - Fall 2025
@@ -7,21 +6,36 @@
 #include "Player.h"
 #include "Item.h"
 #include <SFML/Window/Keyboard.hpp>
+#include <iostream>
 
-// Constructor - CHANGED to use Texture
-Player::Player(float x, float y, const sf::Texture& texture) 
-    : position(x, y),
-      sprite(texture),  // <--- FIX: Initialize sprite HERE with the texture
+// Constructor
+Player::Player(float x, float y) 
+    : position({x, y}),
+      // texture is default initialized here
+      sprite(texture), // SFML 3.0: Sprite must be constructed with a Texture
       speed(200.0f),
       health(100),
       isWarned(false)
 {
-    // We don't need sprite.setTexture(texture) anymore because we did it above.
-    
+    // Load player texture
+    if (texture.loadFromFile("assets/player.png")) {
+        // SFML 3.0: Texture is already linked via reference, but loading changes size.
+        // We might need to reset the texture rect if it doesn't update automatically,
+        // but typically it's fine. explicit setTexture ensures it.
+        sprite.setTexture(texture, true);
+        
+        sf::Vector2u textureSize = texture.getSize();
+        // SFML 3.0: setScale takes a Vector2f, not two floats
+        sprite.setScale({40.0f / textureSize.x, 40.0f / textureSize.y});
+    } else {
+        std::cerr << "Error: Could not load assets/player.png" << std::endl;
+        sprite.setColor(sf::Color::Green);
+        // Set a default size for the fallback colored square (requires texture rect trickery or just use scale)
+        sprite.setTextureRect(sf::IntRect({0, 0}, {40, 40})); 
+    }
+
+    // SFML 3.0: setPosition takes Vector2f
     sprite.setPosition(position);
-    
-    // If the sprite is too big, you can scale it here:
-    sprite.setScale({0.05f, 0.05f}); 
 }
 
 // Move player by delta amounts
@@ -62,8 +76,7 @@ void Player::handleInput(float deltaTime) {
 
 // Set player position
 void Player::setPosition(float x, float y) {
-    position.x = x;
-    position.y = y;
+    position = {x, y};
     sprite.setPosition(position);
 }
 
@@ -132,7 +145,7 @@ void Player::draw(sf::RenderWindow& window) {
     window.draw(sprite);
 }
 
-// Update player (for animations, etc.)
+// Update player
 void Player::update(float deltaTime) {
     sprite.setPosition(position);
 }

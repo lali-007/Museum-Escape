@@ -1,4 +1,3 @@
-
 #ifndef GUARD_H
 #define GUARD_H
 
@@ -10,48 +9,53 @@ class Player; // Forward declaration
 class Guard {
 private:
     sf::Vector2f position;
-    sf::Sprite sprite; // CHANGED: Now a Sprite
+    // IMPORTANT: texture must be declared BEFORE sprite
+    sf::Texture texture;     
+    sf::Sprite sprite;       
+    
     float speed;
     
-    // Patrol logic
+    // Patrol system
     std::vector<sf::Vector2f> patrolPoints;
     int currentPatrolIndex;
-    bool movingForward;
+    bool movingForward; // Direction along patrol path
     
-    // Detection logic
+    // Detection
     float detectionRadius;
+    sf::CircleShape detectionCircle; // Visual representation
     bool hasDetectedPlayer;
-    float detectionCooldown; // Time before guard can detect again
+    float detectionCooldown; // Cooldown timer to prevent spam
     float cooldownTime;
     
-    // Visuals
-    sf::CircleShape detectionCircle;
+    // Room bounds (guard stays within room)
     sf::FloatRect roomBounds;
     
 public:
-    // Constructor - CHANGED: Takes Texture
-    Guard(float x, float y, float detectionRange, const sf::Texture& texture);
+    // Constructor
+    Guard(float x, float y, float detectionRange = 100.0f);
     
     // Patrol management
     void addPatrolPoint(float x, float y);
     void setPatrolPoints(const std::vector<sf::Vector2f>& points);
+    void patrol(float deltaTime);
+    
+    // Room bounds
     void setRoomBounds(const sf::FloatRect& bounds);
     
-    // AI Logic
-    void patrol(float deltaTime);
+    // Detection and collision
     bool detectPlayer(const Player& player);
-    void update(float deltaTime, const Player& player);
-    
-    // Rendering
-    void draw(sf::RenderWindow& window, bool showDetectionRadius = true);
-    
-    // Utilities
     bool checkCollision(const sf::FloatRect& bounds);
     sf::FloatRect getBounds() const;
+    
+    // Position
     sf::Vector2f getPosition() const;
     void setPosition(float x, float y);
     
-private:
+    // Update and render
+    void update(float deltaTime, const Player& player);
+    void draw(sf::RenderWindow& window, bool showDetectionRadius = false);
+    
+    // AI behavior
     void moveTowards(const sf::Vector2f& target, float deltaTime);
     float distanceTo(const sf::Vector2f& point) const;
 };
