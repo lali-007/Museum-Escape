@@ -1,7 +1,7 @@
 /*
- * Museum Escape - Item Class STUB Implementation
+ * Museum Escape - Item Class Implementation (ENHANCED)
  * CS/CE 224/272 - Fall 2025
- * TEMPORARY - For testing only
+ * Phase 1: Added Tool class for Flashlight & Bolt Cutters
  */
 
 #include "Item.h"
@@ -21,30 +21,91 @@ bool Item::isItemCollected() const { return isCollected; }
 sf::FloatRect Item::getBounds() const { return sprite.getGlobalBounds(); }
 
 void Item::collect() { isCollected = true; }
-void Item::draw(sf::RenderWindow& window) { window.draw(sprite); }
+void Item::draw(sf::RenderWindow& window) { 
+    if (!isCollected) {
+        window.draw(sprite); 
+    }
+}
 bool Item::checkCollision(const sf::FloatRect& bounds) {
     return sprite.getGlobalBounds().findIntersection(bounds).has_value();
 }
 
 // Key Constructor
 Key::Key(const std::string& keyName, const std::string& doorIdentifier, float x, float y)
-    : Item(keyName, "A key", x, y), doorID(doorIdentifier) {}
+    : Item(keyName, "A key to unlock doors", x, y), doorID(doorIdentifier) {
+    sprite.setFillColor(sf::Color::Cyan); // Keys are cyan
+}
 
 void Key::use() {}
 std::string Key::getDoorID() const { return doorID; }
 
 // Passcode Constructor
 Passcode::Passcode(const std::string& passcodeName, const std::string& codeValue, float x, float y)
-    : Item(passcodeName, "A passcode", x, y), code(codeValue) {}
+    : Item(passcodeName, "A numeric passcode", x, y), code(codeValue) {
+    sprite.setFillColor(sf::Color::Magenta); // Passcodes are magenta
+}
 
 void Passcode::use() {}
 std::string Passcode::getCode() const { return code; }
 
-// Inventory Constructor
+// BasicItem Constructor
+BasicItem::BasicItem(const std::string& itemName, const std::string& desc, float x, float y)
+    : Item(itemName, desc, x, y) {
+    sprite.setFillColor(sf::Color::White); // Basic items are white
+}
+
+void BasicItem::use() {
+    // Does nothing - just a collectible
+}
+
+// ========================================================================
+// NEW: Tool Class Implementation
+// ========================================================================
+
+// Tool Constructor
+Tool::Tool(const std::string& toolName, const std::string& type, const std::string& desc, float x, float y)
+    : Item(toolName, desc, x, y), toolType(type), isActive(false) {
+    // Different colors for different tools
+    if (type == "flashlight") {
+        sprite.setFillColor(sf::Color(255, 255, 150)); // Light yellow for flashlight
+    } else if (type == "bolt_cutters") {
+        sprite.setFillColor(sf::Color(150, 150, 150)); // Gray for bolt cutters
+    } else {
+        sprite.setFillColor(sf::Color(100, 200, 255)); // Light blue for other tools
+    }
+}
+
+void Tool::use() {
+    isActive = !isActive; // Toggle active state
+}
+
+std::string Tool::getToolType() const {
+    return toolType;
+}
+
+void Tool::activate() {
+    isActive = true;
+}
+
+void Tool::deactivate() {
+    isActive = false;
+}
+
+bool Tool::isToolActive() const {
+    return isActive;
+}
+
+// ========================================================================
+// Inventory Class Implementation
+// ========================================================================
+
+// Inventory Constructor (increased capacity to 15)
 Inventory::Inventory(int capacity)
-    : maxCapacity(capacity), isVisible(false), background({300.0f, 400.0f}) {
+    : maxCapacity(capacity), isVisible(false), background({400.0f, 500.0f}) {
     background.setFillColor(sf::Color(0, 0, 0, 200));
-    background.setPosition({250.0f, 100.0f});
+    background.setOutlineThickness(3.0f);
+    background.setOutlineColor(sf::Color::White);
+    background.setPosition({200.0f, 50.0f});
 }
 
 bool Inventory::addItem(std::shared_ptr<Item> item) {
@@ -79,7 +140,19 @@ std::shared_ptr<Item> Inventory::getItem(const std::string& itemName) {
     return nullptr;
 }
 
-int Inventory::getItemCount() const { return items.size(); }
+// NEW: Check if player has a specific tool type
+bool Inventory::hasTool(const std::string& toolType) const {
+    for (const auto& item : items) {
+        // Try to cast to Tool
+        Tool* tool = dynamic_cast<Tool*>(item.get());
+        if (tool && tool->getToolType() == toolType) {
+            return true;
+        }
+    }
+    return false;
+}
+
+int Inventory::getItemCount() const { return static_cast<int>(items.size()); }
 int Inventory::getMaxCapacity() const { return maxCapacity; }
 bool Inventory::isFull() const { return items.size() >= static_cast<size_t>(maxCapacity); }
 std::vector<std::shared_ptr<Item>>& Inventory::getItems() { return items; }
@@ -90,9 +163,42 @@ bool Inventory::getVisible() const { return isVisible; }
 void Inventory::setFont(const sf::Font& f) { font = f; }
 
 void Inventory::draw(sf::RenderWindow& window) {
-    if (isVisible) {
-        window.draw(background);
+    if (!isVisible) return;
+    
+    window.draw(background);
+    
+    sf::Text title(font);
+    title.setString("INVENTORY");
+    title.setCharacterSize(24);
+    title.setFillColor(sf::Color::White);
+    title.setPosition({350.0f, 70.0f});
+    window.draw(title);
+    
+    float yPos = 110.0f;
+    int index = 1;
+    
+    for (const auto& item : items) {
+        sf::Text itemText(font);
+        itemText.setString(std::to_string(index) + ". " + item->getName());
+        itemText.setCharacterSize(18);
+        itemText.setFillColor(sf::Color::White);
+        itemText.setPosition({220.0f, yPos});
+        window.draw(itemText);
+        
+        yPos += 30.0f;
+        index++;
+    }
+    
+    if (items.empty()) {
+        sf::Text emptyText(font);
+        emptyText.setString("No items");
+        emptyText.setCharacterSize(18);
+        emptyText.setFillColor(sf::Color(150, 150, 150));
+        emptyText.setPosition({220.0f, 110.0f});
+        window.draw(emptyText);
     }
 }
 
-void Inventory::clear() { items.clear(); }
+void Inventory::clear() {
+    items.clear();
+}
