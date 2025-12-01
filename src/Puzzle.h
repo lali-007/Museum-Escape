@@ -13,6 +13,10 @@ protected:
     std::string hint;
     int timeBonus; // Time bonus for solving
     int timePenalty; // Time penalty for failing
+    std::optional<sf::Sprite> worldSprite; 
+    
+    // === NEW: Store position here until sprite is created ===
+    sf::Vector2f storedPosition;
     
 public:
     // Constructor
@@ -34,6 +38,11 @@ public:
     int getTimeBonus() const;
     int getTimePenalty() const;
     void setSolved(bool status);
+
+    void setPosition(float x, float y);
+    void setWorldTexture(const sf::Texture& texture);
+    void drawWorldSprite(sf::RenderWindow& window);
+    bool checkCollision(const sf::FloatRect& bounds) const;
 };
 
 // Riddle Puzzle - Answer a logic riddle

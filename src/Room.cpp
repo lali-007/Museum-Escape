@@ -1,100 +1,102 @@
 /*
  * Museum Escape - Room Class Implementation
  * CS/CE 224/272 - Fall 2025
- * SFML 3.0 COMPATIBLE (Fixed Background Display)
  */
 
 #include "Room.h"
 #include "Puzzle.h"
 #include "Item.h"
 #include "Guard.h"
-#include <iostream>
+#include <cstdint> // <--- ADDED: Required for std::uint8_t
 
-// Constructor
-Room::Room(int id, const std::string& name, float x, float y, float width, float height, const std::string& imagePath)
+Room::Room(int id, const std::string& name, float x, float y, float width, float height)
     : roomID(id),
       roomName(name),
       position(x, y),
       size(width, height),
-      bgSprite(bgTexture), // Initialize sprite with texture
+      hasSolvedTexture(false),
+      isTransitioning(false),
+      transitionAlpha(0.0f),
       isExitRoom(false),
       isVisited(false)
 {
-    // Attempt to load background texture
-    if (!bgTexture.loadFromFile(imagePath)) {
-        // Fallback: Create a colored background if image fails
-        sf::Image img;
-        // SFML 3.0 uses resize() instead of create()
-        img.resize({static_cast<unsigned int>(width), static_cast<unsigned int>(height)}, sf::Color(40, 40, 50));
-        
-        if (!bgTexture.loadFromImage(img)) {
-             std::cerr << "Error: Failed to create fallback texture." << std::endl;
-        }
-        std::cout << "Warning: Could not load " << imagePath << ". Using default color." << std::endl;
-    }
+    // Normal Background
+    background.setSize({width, height});
+    background.setPosition(position);
+    background.setFillColor(sf::Color(40, 40, 50)); 
+    background.setOutlineThickness(2.0f);
+    background.setOutlineColor(sf::Color::White);
+
+    // Solved Background - Start INVISIBLE
+    solvedBackground.setSize({width, height});
+    solvedBackground.setPosition(position);
+    solvedBackground.setFillColor(sf::Color(255, 255, 255, 0)); // Alpha = 0
+}
+
+void Room::setBackgroundTexture(const sf::Texture& texture) {
+    background.setTexture(&texture);
+    background.setFillColor(sf::Color::White);
+}
+
+// Ensure it starts transparent
+void Room::setSolvedBackgroundTexture(const sf::Texture& texture) {
+    solvedBackground.setTexture(&texture);
+    hasSolvedTexture = true;
     
-    // --- CRITICAL FIX START ---
-    // We must tell the sprite the new size of the texture, otherwise it draws nothing!
-    sf::Vector2u texSize = bgTexture.getSize();
-    bgSprite.setTextureRect(sf::IntRect({0, 0}, {static_cast<int>(texSize.x), static_cast<int>(texSize.y)}));
-    // --- CRITICAL FIX END ---
+    // Force it to be invisible initially!
+    solvedBackground.setFillColor(sf::Color(255, 255, 255, 0));
+    transitionAlpha = 0.0f;
+}
 
-    bgSprite.setPosition(position);
-    
-    // Scale sprite to fit room dimensions exactly
-    if (texSize.x > 0 && texSize.y > 0) {
-        bgSprite.setScale({width / texSize.x, height / texSize.y});
+// Start smooth fade-in
+void Room::revealSolvedBackground() {
+    if (hasSolvedTexture && transitionAlpha < 255.0f) {
+        isTransitioning = true;
     }
 }
 
-void Room::addPuzzle(std::shared_ptr<Puzzle> puzzle) { puzzles.push_back(puzzle); }
-std::vector<std::shared_ptr<Puzzle>>& Room::getPuzzles() { return puzzles; }
-
-bool Room::allPuzzlesSolved() const {
-    for (const auto& puzzle : puzzles) {
-        if (!puzzle->isSolvedStatus()) return false;
-    }
-    return true;
-}
-
-void Room::addItem(std::shared_ptr<Item> item) { items.push_back(item); }
-void Room::removeItem(std::shared_ptr<Item> item) {
-    for (auto it = items.begin(); it != items.end(); ++it) {
-        if (*it == item) {
-            items.erase(it);
-            return;
-        }
+// Instant show (for re-entering solved rooms)
+void Room::forceSolvedBackground() {
+    if (hasSolvedTexture) {
+        transitionAlpha = 255.0f;
+        solvedBackground.setFillColor(sf::Color(255, 255, 255, 255));
+        isTransitioning = false;
     }
 }
-std::vector<std::shared_ptr<Item>>& Room::getItems() { return items; }
-
-void Room::addGuard(std::shared_ptr<Guard> guard) { guards.push_back(guard); }
-std::vector<std::shared_ptr<Guard>>& Room::getGuards() { return guards; }
-
-void Room::addDoor(std::shared_ptr<Door> door) { doors.push_back(door); }
-std::vector<std::shared_ptr<Door>>& Room::getDoors() { return doors; }
-
-int Room::getRoomID() const { return roomID; }
-std::string Room::getRoomName() const { return roomName; }
-sf::Vector2f Room::getPosition() const { return position; }
-sf::Vector2f Room::getSize() const { return size; }
-sf::FloatRect Room::getBounds() const { return bgSprite.getGlobalBounds(); }
-
-void Room::setExitRoom(bool isExit) { isExitRoom = isExit; }
-bool Room::isExit() const { return isExitRoom; }
-void Room::setVisited(bool visited) { isVisited = visited; }
-bool Room::hasBeenVisited() const { return isVisited; }
 
 void Room::update(float deltaTime) {
+    // Handle fade-in transition
+    if (isTransitioning) {
+        transitionAlpha += deltaTime * 200.0f; // Speed of fade
+        
+        if (transitionAlpha >= 255.0f) {
+            transitionAlpha = 255.0f;
+            isTransitioning = false;
+        }
+        
+        // Update alpha
+        // FIXED: Replaced sf::Uint8 with std::uint8_t
+        solvedBackground.setFillColor(sf::Color(255, 255, 255, static_cast<std::uint8_t>(transitionAlpha)));
+    }
+
+    // Update puzzles
     for (auto& puzzle : puzzles) {
         puzzle->update(deltaTime);
     }
 }
 
 void Room::draw(sf::RenderWindow& window) {
-    // Draw the background image
-    window.draw(bgSprite);
+    // 1. Always draw normal background at bottom
+    window.draw(background);
     
+    // 2. Draw solved background on top (only if partially/fully visible)
+    if (hasSolvedTexture && transitionAlpha > 0.0f) {
+        window.draw(solvedBackground);
+    }
+    for (auto& puzzle : puzzles) {
+        puzzle->drawWorldSprite(window);
+    }
+    // Draw entities
     for (auto& guard : guards) guard->draw(window, true);
     for (auto& door : doors) door->draw(window);
     for (auto& item : items) {
@@ -102,56 +104,61 @@ void Room::draw(sf::RenderWindow& window) {
     }
 }
 
-bool Room::containsPoint(const sf::Vector2f& point) const {
-    return bgSprite.getGlobalBounds().contains(point);
+// ... (Rest of Room methods) ...
+
+void Room::addPuzzle(std::shared_ptr<Puzzle> puzzle) { puzzles.push_back(puzzle); }
+std::vector<std::shared_ptr<Puzzle>>& Room::getPuzzles() { return puzzles; }
+bool Room::allPuzzlesSolved() const {
+    for (const auto& puzzle : puzzles) {
+        if (!puzzle->isSolvedStatus()) return false;
+    }
+    return true;
 }
+void Room::addItem(std::shared_ptr<Item> item) { items.push_back(item); }
+void Room::removeItem(std::shared_ptr<Item> item) {
+    for (auto it = items.begin(); it != items.end(); ++it) {
+        if (*it == item) { items.erase(it); return; }
+    }
+}
+std::vector<std::shared_ptr<Item>>& Room::getItems() { return items; }
+void Room::addGuard(std::shared_ptr<Guard> guard) { guards.push_back(guard); }
+std::vector<std::shared_ptr<Guard>>& Room::getGuards() { return guards; }
+void Room::addDoor(std::shared_ptr<Door> door) { doors.push_back(door); }
+std::vector<std::shared_ptr<Door>>& Room::getDoors() { return doors; }
+int Room::getRoomID() const { return roomID; }
+std::string Room::getRoomName() const { return roomName; }
+sf::Vector2f Room::getPosition() const { return position; }
+sf::Vector2f Room::getSize() const { return size; }
+sf::FloatRect Room::getBounds() const { return background.getGlobalBounds(); }
+void Room::setExitRoom(bool isExit) { isExitRoom = isExit; }
+bool Room::isExit() const { return isExitRoom; }
+void Room::setVisited(bool visited) { isVisited = visited; }
+bool Room::hasBeenVisited() const { return isVisited; }
+bool Room::containsPoint(const sf::Vector2f& point) const { return background.getGlobalBounds().contains(point); }
 
-// ============================================================================
-// Door Class Implementation
-// ============================================================================
-
+// === DOOR IMPLEMENTATION ===
 Door::Door(float x, float y, int targetRoom, bool locked, const std::string& keyName)
-    : position(x, y),
-      targetRoomID(targetRoom),
-      isLocked(locked),
-      requiredKey(keyName)
-{
-    sprite.setSize({30.0f, 60.0f});
+    : position(x, y), targetRoomID(targetRoom), isLocked(locked), requiredKey(keyName) {
+    sprite.setSize({50.0f, 100.0f});
     sprite.setPosition(position);
-    
-    if (isLocked) sprite.setFillColor(sf::Color::Red);
-    else sprite.setFillColor(sf::Color(100, 100, 100));
-    
-    sprite.setOutlineThickness(2.0f);
-    sprite.setOutlineColor(sf::Color::White);
+    sprite.setFillColor(sf::Color::Transparent); // Invisible door
 }
-
-void Door::unlock() {
-    isLocked = false;
-    sprite.setFillColor(sf::Color::Blue); // Turn Blue when unlocked
-}
-
+void Door::unlock() { isLocked = false; }
 bool Door::canOpen(const std::string& keyName) {
     if (!isLocked) return true;
-    if (keyName == requiredKey || requiredKey.empty()) {
-        unlock();
-        return true;
-    }
+    if (keyName == requiredKey || requiredKey.empty()) { unlock(); return true; }
     return false;
 }
-
-bool Door::checkCollision(const sf::FloatRect& bounds) {
-    return sprite.getGlobalBounds().findIntersection(bounds).has_value();
-}
-
+bool Door::checkCollision(const sf::FloatRect& bounds) { return sprite.getGlobalBounds().findIntersection(bounds).has_value(); }
 int Door::getTargetRoomID() const { return targetRoomID; }
 bool Door::getLockedStatus() const { return isLocked; }
 sf::FloatRect Door::getBounds() const { return sprite.getGlobalBounds(); }
-
-// --- Dynamic Color Logic ---
-std::string Door::getRequiredKey() const { return requiredKey; }
-void Door::setColor(const sf::Color& color) { sprite.setFillColor(color); }
-
-void Door::draw(sf::RenderWindow& window) {
-    window.draw(sprite);
+void Door::draw(sf::RenderWindow& window) { window.draw(sprite); }
+std::shared_ptr<Puzzle> Room::getIntersectingPuzzle(const sf::FloatRect& playerBounds) {
+    for (auto& puzzle : puzzles) {
+        if (puzzle->checkCollision(playerBounds)) {
+            return puzzle;
+        }
+    }
+    return nullptr;
 }

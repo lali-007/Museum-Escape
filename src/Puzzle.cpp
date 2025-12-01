@@ -9,7 +9,15 @@
 
 // Puzzle Base Class
 Puzzle::Puzzle(const std::string& desc, const std::string& hintText, int bonus, int penalty)
-    : isSolved(false), description(desc), hint(hintText), timeBonus(bonus), timePenalty(penalty) {}
+    : isSolved(false), 
+      description(desc), 
+      hint(hintText), 
+      timeBonus(bonus), 
+      timePenalty(penalty),
+      storedPosition({0.f, 0.f}) // Initialize default position
+{
+    // worldSprite is left empty (std::nullopt) here, preventing the error
+}
 
 bool Puzzle::isSolvedStatus() const { return isSolved; }
 std::string Puzzle::getDescription() const { return description; }
@@ -18,6 +26,42 @@ int Puzzle::getTimeBonus() const { return timeBonus; }
 int Puzzle::getTimePenalty() const { return timePenalty; }
 void Puzzle::setSolved(bool status) { isSolved = status; }
 
+void Puzzle::setPosition(float x, float y) {
+    storedPosition = {x, y};
+    if (worldSprite.has_value()) {
+        worldSprite->setPosition(storedPosition);
+    }
+}
+
+// === FIXED: Create the sprite now that we have a texture ===
+void Puzzle::setWorldTexture(const sf::Texture& texture) {
+    // Construct the sprite IN PLACE using the texture
+    worldSprite.emplace(texture);
+    
+    // Apply the stored settings
+    worldSprite->setPosition(storedPosition);
+    float targetSize = 40.0f; 
+    
+    sf::Vector2u texSize = texture.getSize();
+    // Calculate scale factor (Target / Max Dimension)
+    float scaleFactor = targetSize / std::max(texSize.x, texSize.y);
+    
+    worldSprite->setScale({scaleFactor, scaleFactor}); 
+    worldSprite->setColor(sf::Color(255, 200, 200));
+}
+
+// === FIXED: Check if sprite exists before drawing ===
+void Puzzle::drawWorldSprite(sf::RenderWindow& window) {
+    if (!isSolved && worldSprite.has_value()) {
+        window.draw(*worldSprite); // Dereference (*) to get the actual sprite
+    }
+}
+
+// === FIXED: Check if sprite exists before collision ===
+bool Puzzle::checkCollision(const sf::FloatRect& bounds) const {
+    if (isSolved || !worldSprite.has_value()) return false;
+    return worldSprite->getGlobalBounds().findIntersection(bounds).has_value();
+}
 // ============================================================================
 // RiddlePuzzle - Fully Interactive
 // ============================================================================
@@ -608,6 +652,7 @@ void LockPuzzle::clearCode() {
 }
 /*
  * Museum Escape - Puzzle Class Implementation (PHASE 2)
+ * CS/CE 224/272 - Fall 2025
  * 
  * Phase 2 Additions:
  * - MathPuzzle class

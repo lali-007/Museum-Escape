@@ -31,7 +31,7 @@ Guard::Guard(float x, float y, float detectionRange, const sf::Texture& texture)
     sf::FloatRect bounds = sprite.getLocalBounds();
     detectionCircle.setOrigin({detectionRange - bounds.size.x/2.0f, detectionRange - bounds.size.y/2.0f});
     detectionCircle.setPosition(position);
-    sprite.setScale({0.05f, 0.05f});
+    sprite.setScale({0.1f, 0.1f});
 }
 
 // Add patrol point
