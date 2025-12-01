@@ -12,12 +12,12 @@ protected:
     std::string name;
     std::string description;
     sf::Vector2f position;
-    sf::RectangleShape sprite;
+    sf::Sprite sprite; // <--- CHANGED to Sprite
     bool isCollected;
     
 public:
-    // Constructor
-    Item(const std::string& itemName, const std::string& desc, float x, float y);
+    // Constructor now takes a texture
+    Item(const std::string& itemName, const std::string& desc, float x, float y, const sf::Texture& texture);
     virtual ~Item() = default;
     
     // Getters
@@ -29,7 +29,7 @@ public:
     
     // Actions
     void collect();
-    virtual void use() = 0; // Pure virtual - each item type has unique use
+    virtual void use() = 0; 
     
     // Rendering
     void draw(sf::RenderWindow& window);
@@ -38,39 +38,55 @@ public:
     bool checkCollision(const sf::FloatRect& bounds);
 };
 
-// Key item - Unlocks doors
+// Key item
 class Key : public Item {
 private:
-    std::string doorID; // Which door this key unlocks
+    std::string doorID;
     
 public:
-    Key(const std::string& keyName, const std::string& doorIdentifier, float x, float y);
+    Key(const std::string& keyName, const std::string& doorIdentifier, float x, float y, const sf::Texture& texture);
     
     void use() override;
     std::string getDoorID() const;
 };
 
-// Passcode item - Used for digital locks
+// Passcode item
 class Passcode : public Item {
 private:
-    std::string code; // The numeric code
+    std::string code;
     
 public:
-    Passcode(const std::string& passcodeName, const std::string& codeValue, float x, float y);
+    Passcode(const std::string& passcodeName, const std::string& codeValue, float x, float y, const sf::Texture& texture);
     
     void use() override;
     std::string getCode() const;
 };
 
-// BasicItem - Simple collectible with no special use
+// BasicItem
 class BasicItem : public Item {
 public:
-    BasicItem(const std::string& itemName, const std::string& desc, float x, float y);
+    BasicItem(const std::string& itemName, const std::string& desc, float x, float y, const sf::Texture& texture);
     
-    void use() override; // Does nothing, just for collection
+    void use() override;
 };
 
-// Inventory class - Manages player's collected items
+// Tool item
+class Tool : public Item {
+private:
+    std::string toolType;
+    bool isActive;
+    
+public:
+    Tool(const std::string& toolName, const std::string& type, const std::string& desc, float x, float y, const sf::Texture& texture);
+    
+    void use() override;
+    std::string getToolType() const;
+    void activate();
+    void deactivate();
+    bool isToolActive() const;
+};
+
+// Inventory class (Unchanged)
 class Inventory {
 private:
     std::vector<std::shared_ptr<Item>> items;
@@ -80,31 +96,21 @@ private:
     bool isVisible;
     
 public:
-    // Constructor
-    Inventory(int capacity = 10);
-    
-    // Item management
+    Inventory(int capacity = 15);
     bool addItem(std::shared_ptr<Item> item);
     bool removeItem(const std::string& itemName);
     bool hasItem(const std::string& itemName) const;
     std::shared_ptr<Item> getItem(const std::string& itemName);
-    
-    // Inventory properties
+    bool hasTool(const std::string& toolType) const;
     int getItemCount() const;
     int getMaxCapacity() const;
     bool isFull() const;
     std::vector<std::shared_ptr<Item>>& getItems();
-    
-    // Display
     void toggleVisibility();
     void setVisible(bool visible);
     bool getVisible() const;
     void setFont(const sf::Font& f);
-    
-    // Rendering
     void draw(sf::RenderWindow& window);
-    
-    // Clear inventory
     void clear();
 };
 

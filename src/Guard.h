@@ -28,6 +28,9 @@ private:
     sf::CircleShape detectionCircle;
     sf::FloatRect roomBounds;
     
+    void moveTowards(const sf::Vector2f& target, float deltaTime);
+    float distanceTo(const sf::Vector2f& point) const;
+    
 public:
     // Constructor - CHANGED: Takes Texture
     Guard(float x, float y, float detectionRange, const sf::Texture& texture);
@@ -50,10 +53,5 @@ public:
     sf::FloatRect getBounds() const;
     sf::Vector2f getPosition() const;
     void setPosition(float x, float y);
-    
-private:
-    void moveTowards(const sf::Vector2f& target, float deltaTime);
-    float distanceTo(const sf::Vector2f& point) const;
 };
-
 #endif // GUARD_H

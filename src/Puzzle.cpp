@@ -9,7 +9,15 @@
 
 // Puzzle Base Class
 Puzzle::Puzzle(const std::string& desc, const std::string& hintText, int bonus, int penalty)
-    : isSolved(false), description(desc), hint(hintText), timeBonus(bonus), timePenalty(penalty) {}
+    : isSolved(false), 
+      description(desc), 
+      hint(hintText), 
+      timeBonus(bonus), 
+      timePenalty(penalty),
+      storedPosition({0.f, 0.f}) // Initialize default position
+{
+    // worldSprite is left empty (std::nullopt) here, preventing the error
+}
 
 bool Puzzle::isSolvedStatus() const { return isSolved; }
 std::string Puzzle::getDescription() const { return description; }
@@ -18,6 +26,42 @@ int Puzzle::getTimeBonus() const { return timeBonus; }
 int Puzzle::getTimePenalty() const { return timePenalty; }
 void Puzzle::setSolved(bool status) { isSolved = status; }
 
+void Puzzle::setPosition(float x, float y) {
+    storedPosition = {x, y};
+    if (worldSprite.has_value()) {
+        worldSprite->setPosition(storedPosition);
+    }
+}
+
+// === FIXED: Create the sprite now that we have a texture ===
+void Puzzle::setWorldTexture(const sf::Texture& texture) {
+    // Construct the sprite IN PLACE using the texture
+    worldSprite.emplace(texture);
+    
+    // Apply the stored settings
+    worldSprite->setPosition(storedPosition);
+    float targetSize = 40.0f; 
+    
+    sf::Vector2u texSize = texture.getSize();
+    // Calculate scale factor (Target / Max Dimension)
+    float scaleFactor = targetSize / std::max(texSize.x, texSize.y);
+    
+    worldSprite->setScale({scaleFactor, scaleFactor}); 
+    worldSprite->setColor(sf::Color(255, 200, 200));
+}
+
+// === FIXED: Check if sprite exists before drawing ===
+void Puzzle::drawWorldSprite(sf::RenderWindow& window) {
+    if (!isSolved && worldSprite.has_value()) {
+        window.draw(*worldSprite); // Dereference (*) to get the actual sprite
+    }
+}
+
+// === FIXED: Check if sprite exists before collision ===
+bool Puzzle::checkCollision(const sf::FloatRect& bounds) const {
+    if (isSolved || !worldSprite.has_value()) return false;
+    return worldSprite->getGlobalBounds().findIntersection(bounds).has_value();
+}
 // ============================================================================
 // RiddlePuzzle - Fully Interactive
 // ============================================================================
@@ -605,4 +649,557 @@ void LockPuzzle::removeDigit() {
 
 void LockPuzzle::clearCode() {
     enteredCode.clear();
+}
+/*
+ * Museum Escape - Puzzle Class Implementation (PHASE 2)
+ * CS/CE 224/272 - Fall 2025
+ * 
+ * Phase 2 Additions:
+ * - MathPuzzle class
+ * - WirePuzzle class
+ */
+
+// NOTE: This file should be APPENDED to your existing Puzzle.cpp
+// Copy everything from "// PHASE 2 NEW PUZZLES" onwards to the end of your Puzzle.cpp
+
+// ============================================================================
+// PHASE 2: NEW PUZZLE IMPLEMENTATIONS
+// ============================================================================
+
+// ============================================================================
+// Math Puzzle Implementation
+// ============================================================================
+
+MathPuzzle::MathPuzzle(const std::string& eq, const std::string& answer)
+    : Puzzle("Solve the equation to unlock the safe", "Check the equation carefully", 35, 10),
+      equation(eq), correctAnswer(answer), maxDigits(3),
+      equationText(defaultFont), answerDisplay(defaultFont) {
+    
+    playerAnswer = "";
+    
+    equationText.setCharacterSize(32);
+    equationText.setFillColor(sf::Color::White);
+    
+    answerDisplay.setCharacterSize(28);
+    answerDisplay.setFillColor(sf::Color::Cyan);
+}
+
+bool MathPuzzle::solve(const std::string& answer) {
+    if (playerAnswer == correctAnswer) {
+        isSolved = true;
+        return true;
+    }
+    return false;
+}
+
+void MathPuzzle::display(sf::RenderWindow& window) {
+    // Dark overlay
+    sf::RectangleShape overlay({800.0f, 600.0f});
+    overlay.setFillColor(sf::Color(0, 0, 0, 180));
+    window.draw(overlay);
+    
+    // Puzzle box
+    sf::RectangleShape puzzleBox({600.0f, 500.0f});
+    puzzleBox.setPosition({100.0f, 50.0f});
+    puzzleBox.setFillColor(sf::Color(40, 40, 60));
+    puzzleBox.setOutlineThickness(3.0f);
+    puzzleBox.setOutlineColor(sf::Color::Cyan);
+    window.draw(puzzleBox);
+    
+    // Title
+    sf::Text title(font);
+    title.setString("MATH PUZZLE - SAFE LOCK");
+    title.setCharacterSize(26);
+    title.setFillColor(sf::Color::Cyan);
+    title.setPosition({220.0f, 70.0f});
+    window.draw(title);
+    
+    // Instructions
+    sf::Text instructions(font);
+    instructions.setString("Solve the equation to unlock the safe:");
+    instructions.setCharacterSize(18);
+    instructions.setFillColor(sf::Color::White);
+    instructions.setPosition({200.0f, 120.0f});
+    window.draw(instructions);
+    
+    // Equation display
+    equationText.setFont(font);
+    equationText.setString(equation);
+    equationText.setPosition({300.0f, 180.0f});
+    window.draw(equationText);
+    
+    // Answer label
+    sf::Text answerLabel(font);
+    answerLabel.setString("Enter 3-digit answer:");
+    answerLabel.setCharacterSize(20);
+    answerLabel.setFillColor(sf::Color::White);
+    answerLabel.setPosition({250.0f, 250.0f});
+    window.draw(answerLabel);
+    
+    // Answer input box
+    sf::RectangleShape answerBox({200.0f, 50.0f});
+    answerBox.setPosition({300.0f, 290.0f});
+    answerBox.setFillColor(sf::Color(20, 20, 30));
+    answerBox.setOutlineThickness(3.0f);
+    answerBox.setOutlineColor(sf::Color::Cyan);
+    window.draw(answerBox);
+    
+    // Display entered answer with underscores
+    std::string displayAnswer = "";
+    for (size_t i = 0; i < playerAnswer.length(); i++) {
+        displayAnswer += playerAnswer[i];
+        displayAnswer += " ";
+    }
+    for (size_t i = playerAnswer.length(); i < (size_t)maxDigits; i++) {
+        displayAnswer += "_ ";
+    }
+    
+    answerDisplay.setFont(font);
+    answerDisplay.setString(displayAnswer);
+    answerDisplay.setPosition({330.0f, 300.0f});
+    window.draw(answerDisplay);
+    
+    // Numeric keypad (simplified 3x3 + bottom row)
+    float keypadX = 250.0f;
+    float keypadY = 360.0f;
+    float buttonSize = 60.0f;
+    float spacing = 80.0f;
+    
+    // Draw 1-9 buttons
+    for (int i = 1; i <= 9; i++) {
+        int row = (i - 1) / 3;
+        int col = (i - 1) % 3;
+        
+        float x = keypadX + col * spacing;
+        float y = keypadY + row * spacing;
+        
+        sf::RectangleShape button({buttonSize, buttonSize});
+        button.setPosition({x, y});
+        button.setFillColor(sf::Color(60, 60, 80));
+        button.setOutlineThickness(2.0f);
+        button.setOutlineColor(sf::Color::White);
+        window.draw(button);
+        
+        sf::Text num(font);
+        num.setString(std::to_string(i));
+        num.setCharacterSize(24);
+        num.setFillColor(sf::Color::White);
+        num.setPosition({x + 22.0f, y + 15.0f});
+        window.draw(num);
+    }
+    
+    // Bottom row: Clear, 0, Submit
+    // Clear button
+    sf::RectangleShape clearBtn({buttonSize, buttonSize});
+    clearBtn.setPosition({keypadX, keypadY + 3 * spacing});
+    clearBtn.setFillColor(sf::Color(100, 50, 50));
+    clearBtn.setOutlineThickness(2.0f);
+    clearBtn.setOutlineColor(sf::Color::White);
+    window.draw(clearBtn);
+    
+    sf::Text clearText(font);
+    clearText.setString("C");
+    clearText.setCharacterSize(22);
+    clearText.setFillColor(sf::Color::White);
+    clearText.setPosition({keypadX + 22.0f, keypadY + 3 * spacing + 16.0f});
+    window.draw(clearText);
+    
+    // 0 button
+    sf::RectangleShape zeroBtn({buttonSize, buttonSize});
+    zeroBtn.setPosition({keypadX + spacing, keypadY + 3 * spacing});
+    zeroBtn.setFillColor(sf::Color(60, 60, 80));
+    zeroBtn.setOutlineThickness(2.0f);
+    zeroBtn.setOutlineColor(sf::Color::White);
+    window.draw(zeroBtn);
+    
+    sf::Text zeroText(font);
+    zeroText.setString("0");
+    zeroText.setCharacterSize(24);
+    zeroText.setFillColor(sf::Color::White);
+    zeroText.setPosition({keypadX + spacing + 22.0f, keypadY + 3 * spacing + 15.0f});
+    window.draw(zeroText);
+    
+    // Submit button
+    sf::RectangleShape submitBtn({buttonSize, buttonSize});
+    submitBtn.setPosition({keypadX + 2 * spacing, keypadY + 3 * spacing});
+    submitBtn.setFillColor(sf::Color(50, 100, 50));
+    submitBtn.setOutlineThickness(2.0f);
+    submitBtn.setOutlineColor(sf::Color::White);
+    window.draw(submitBtn);
+    
+    sf::Text submitText(font);
+    submitText.setString("OK");
+    submitText.setCharacterSize(20);
+    submitText.setFillColor(sf::Color::White);
+    submitText.setPosition({keypadX + 2 * spacing + 16.0f, keypadY + 3 * spacing + 18.0f});
+    window.draw(submitText);
+    
+    // Feedback
+    if (isSolved) {
+        sf::Text feedback(font);
+        feedback.setString("Correct! Safe unlocked! +" + std::to_string(timeBonus) + " seconds!");
+        feedback.setCharacterSize(18);
+        feedback.setFillColor(sf::Color::Green);
+        feedback.setPosition({200.0f, 520.0f});
+        window.draw(feedback);
+    }
+    
+    // Instructions
+    sf::Text controls(font);
+    controls.setString("Click keypad or use keyboard | ESC to exit");
+    controls.setCharacterSize(14);
+    controls.setFillColor(sf::Color(150, 150, 150));
+    controls.setPosition({220.0f, 540.0f});
+    window.draw(controls);
+}
+
+void MathPuzzle::handleInput(sf::Event& event) {
+    if (isSolved) return;
+    
+    // Handle mouse clicks
+    if (const auto* mousePressed = event.getIf<sf::Event::MouseButtonPressed>()) {
+        if (mousePressed->button == sf::Mouse::Button::Left) {
+            float mouseX = static_cast<float>(mousePressed->position.x);
+            float mouseY = static_cast<float>(mousePressed->position.y);
+            
+            float keypadX = 250.0f;
+            float keypadY = 360.0f;
+            float buttonSize = 60.0f;
+            float spacing = 80.0f;
+            
+            // Check 1-9 buttons
+            for (int i = 1; i <= 9; i++) {
+                int row = (i - 1) / 3;
+                int col = (i - 1) % 3;
+                
+                float x = keypadX + col * spacing;
+                float y = keypadY + row * spacing;
+                
+                if (mouseX >= x && mouseX <= x + buttonSize &&
+                    mouseY >= y && mouseY <= y + buttonSize) {
+                    addDigit('0' + i);
+                    return;
+                }
+            }
+            
+            // Check Clear button
+            float clearX = keypadX;
+            float clearY = keypadY + 3 * spacing;
+            if (mouseX >= clearX && mouseX <= clearX + buttonSize &&
+                mouseY >= clearY && mouseY <= clearY + buttonSize) {
+                clearAnswer();
+                return;
+            }
+            
+            // Check 0 button
+            float zeroX = keypadX + spacing;
+            float zeroY = keypadY + 3 * spacing;
+            if (mouseX >= zeroX && mouseX <= zeroX + buttonSize &&
+                mouseY >= zeroY && mouseY <= zeroY + buttonSize) {
+                addDigit('0');
+                return;
+            }
+            
+            // Check Submit button
+            float submitX = keypadX + 2 * spacing;
+            float submitY = keypadY + 3 * spacing;
+            if (mouseX >= submitX && mouseX <= submitX + buttonSize &&
+                mouseY >= submitY && mouseY <= submitY + buttonSize) {
+                solve(playerAnswer);
+                return;
+            }
+        }
+    }
+    
+    // Handle keyboard input
+    if (const auto* textEntered = event.getIf<sf::Event::TextEntered>()) {
+        char entered = static_cast<char>(textEntered->unicode);
+        
+        if (entered == 8) { // Backspace
+            removeDigit();
+        } else if (entered >= '0' && entered <= '9') {
+            addDigit(entered);
+        }
+    }
+    
+    // Handle Enter key
+    if (const auto* keyPressed = event.getIf<sf::Event::KeyPressed>()) {
+        if (keyPressed->code == sf::Keyboard::Key::Enter && playerAnswer.length() == (size_t)maxDigits) {
+            solve(playerAnswer);
+        }
+    }
+}
+
+void MathPuzzle::update(float deltaTime) {
+    // No animation needed for math puzzle
+}
+
+void MathPuzzle::setFont(const sf::Font& f) {
+    font = f;
+    equationText.setFont(font);
+    answerDisplay.setFont(font);
+}
+
+void MathPuzzle::addDigit(char digit) {
+    if (playerAnswer.length() < (size_t)maxDigits && digit >= '0' && digit <= '9') {
+        playerAnswer += digit;
+    }
+}
+
+void MathPuzzle::removeDigit() {
+    if (!playerAnswer.empty()) {
+        playerAnswer.pop_back();
+    }
+}
+
+void MathPuzzle::clearAnswer() {
+    playerAnswer.clear();
+}
+
+// Continue to Part 2 for WirePuzzle...
+// ============================================================================
+// Wire Puzzle Implementation
+// ============================================================================
+
+WirePuzzle::WirePuzzle(const std::vector<std::string>& sequence)
+    : Puzzle("Cut the wires in the correct sequence", "Primary colors first, then secondary", 40, 10),
+      correctSequence(sequence), hasBoltCutters(false),
+      instructionText(defaultFont) {
+    
+    // Initialize wire colors
+    wireColors = {"Red", "Yellow", "Blue", "Green", "Purple"};
+    
+    // Initialize all wires as not cut
+    wireCut = {false, false, false, false, false};
+    
+    // Create wire shapes
+    for (size_t i = 0; i < wireColors.size(); i++) {
+        sf::RectangleShape wire({400.0f, 25.0f});
+        wires.push_back(wire);
+    }
+}
+
+bool WirePuzzle::solve(const std::string& answer) {
+    // Check if cut sequence matches correct sequence
+    if (cutSequence == correctSequence) {
+        isSolved = true;
+        return true;
+    }
+    return false;
+}
+
+void WirePuzzle::display(sf::RenderWindow& window) {
+    // Dark overlay
+    sf::RectangleShape overlay({800.0f, 600.0f});
+    overlay.setFillColor(sf::Color(0, 0, 0, 180));
+    window.draw(overlay);
+    
+    // Puzzle box
+    sf::RectangleShape puzzleBox({650.0f, 550.0f});
+    puzzleBox.setPosition({75.0f, 25.0f});
+    puzzleBox.setFillColor(sf::Color(40, 40, 60));
+    puzzleBox.setOutlineThickness(3.0f);
+    puzzleBox.setOutlineColor(sf::Color(255, 100, 100)); // Red outline for danger
+    window.draw(puzzleBox);
+    
+    // Title
+    sf::Text title(font);
+    title.setString("WIRE CUTTING PUZZLE");
+    title.setCharacterSize(28);
+    title.setFillColor(sf::Color(255, 100, 100));
+    title.setPosition({250.0f, 45.0f});
+    window.draw(title);
+    
+    // Instructions
+    sf::Text instructions(font);
+    if (!hasBoltCutters) {
+        instructions.setString("ERROR: Bolt Cutters required!");
+        instructions.setFillColor(sf::Color::Red);
+    } else {
+        instructions.setString("Cut wires in correct order to disable alarm");
+        instructions.setFillColor(sf::Color::White);
+    }
+    instructions.setCharacterSize(18);
+    instructions.setPosition({180.0f, 90.0f});
+    window.draw(instructions);
+    
+    // Hint
+    sf::Text hintText(font);
+    hintText.setString("Hint: Primary colors first, then secondary");
+    hintText.setCharacterSize(16);
+    hintText.setFillColor(sf::Color(200, 200, 100));
+    hintText.setPosition({200.0f, 120.0f});
+    window.draw(hintText);
+    
+    // Draw wires
+    float wireStartY = 180.0f;
+    float wireSpacing = 60.0f;
+    
+    for (size_t i = 0; i < wireColors.size(); i++) {
+        float y = wireStartY + i * wireSpacing;
+        
+        // Wire background (terminal to terminal)
+        sf::RectangleShape wireBg({400.0f, 25.0f});
+        wireBg.setPosition({200.0f, y});
+        wireBg.setFillColor(getWireColor(wireColors[i]));
+        
+        // If wire is cut, show it as disconnected
+        if (wireCut[i]) {
+            // Left half
+            sf::RectangleShape wireLeft({180.0f, 25.0f});
+            wireLeft.setPosition({200.0f, y});
+            wireLeft.setFillColor(sf::Color(80, 80, 80)); // Gray when cut
+            window.draw(wireLeft);
+            
+            // Right half
+            sf::RectangleShape wireRight({180.0f, 25.0f});
+            wireRight.setPosition({420.0f, y});
+            wireRight.setFillColor(sf::Color(80, 80, 80));
+            window.draw(wireRight);
+            
+            // Cut mark (X)
+            sf::Text cutMark(font);
+            cutMark.setString("✂");
+            cutMark.setCharacterSize(30);
+            cutMark.setFillColor(sf::Color::White);
+            cutMark.setPosition({385.0f, y - 8.0f});
+            window.draw(cutMark);
+        } else {
+            // Wire is intact
+            window.draw(wireBg);
+        }
+        
+        // Wire label
+        sf::Text label(font);
+        label.setString(wireColors[i]);
+        label.setCharacterSize(18);
+        label.setFillColor(sf::Color::White);
+        label.setPosition({100.0f, y + 2.0f});
+        window.draw(label);
+        
+        // Click button (if not cut and have bolt cutters)
+        if (!wireCut[i] && hasBoltCutters) {
+            sf::RectangleShape cutButton({60.0f, 35.0f});
+            cutButton.setPosition({620.0f, y - 5.0f});
+            cutButton.setFillColor(sf::Color(100, 50, 50));
+            cutButton.setOutlineThickness(2.0f);
+            cutButton.setOutlineColor(sf::Color::White);
+            window.draw(cutButton);
+            
+            sf::Text cutText(font);
+            cutText.setString("CUT");
+            cutText.setCharacterSize(14);
+            cutText.setFillColor(sf::Color::White);
+            cutText.setPosition({630.0f, y + 5.0f});
+            window.draw(cutText);
+        }
+    }
+    
+    // Cut sequence display
+    sf::Text sequenceLabel(font);
+    sequenceLabel.setString("Cut Sequence:");
+    sequenceLabel.setCharacterSize(18);
+    sequenceLabel.setFillColor(sf::Color::White);
+    sequenceLabel.setPosition({100.0f, 480.0f});
+    window.draw(sequenceLabel);
+    
+    std::string sequenceStr = "";
+    for (size_t i = 0; i < cutSequence.size(); i++) {
+        sequenceStr += cutSequence[i];
+        if (i < cutSequence.size() - 1) sequenceStr += " → ";
+    }
+    
+    sf::Text sequenceDisplay(font);
+    sequenceDisplay.setString(sequenceStr.empty() ? "None" : sequenceStr);
+    sequenceDisplay.setCharacterSize(16);
+    sequenceDisplay.setFillColor(sf::Color::Cyan);
+    sequenceDisplay.setPosition({100.0f, 510.0f});
+    window.draw(sequenceDisplay);
+    
+    // Feedback
+    if (isSolved) {
+        sf::Text feedback(font);
+        feedback.setString("Success! Alarm disabled! +" + std::to_string(timeBonus) + " seconds!");
+        feedback.setCharacterSize(18);
+        feedback.setFillColor(sf::Color::Green);
+        feedback.setPosition({180.0f, 540.0f});
+        window.draw(feedback);
+    } else if (cutSequence.size() > 0 && cutSequence.size() == correctSequence.size()) {
+        // Wrong sequence
+        sf::Text feedback(font);
+        feedback.setString("WRONG SEQUENCE! Alarm triggered! (Press ESC)");
+        feedback.setCharacterSize(18);
+        feedback.setFillColor(sf::Color::Red);
+        feedback.setPosition({160.0f, 540.0f});
+        window.draw(feedback);
+    }
+    
+    // Controls
+    sf::Text controls(font);
+    controls.setString("Click CUT buttons | ESC to exit");
+    controls.setCharacterSize(14);
+    controls.setFillColor(sf::Color(150, 150, 150));
+    controls.setPosition({250.0f, 555.0f});
+    window.draw(controls);
+}
+
+void WirePuzzle::handleInput(sf::Event& event) {
+    if (isSolved || !hasBoltCutters) return;
+    
+    // Handle mouse clicks on CUT buttons
+    if (const auto* mousePressed = event.getIf<sf::Event::MouseButtonPressed>()) {
+        if (mousePressed->button == sf::Mouse::Button::Left) {
+            float mouseX = static_cast<float>(mousePressed->position.x);
+            float mouseY = static_cast<float>(mousePressed->position.y);
+            
+            float wireStartY = 180.0f;
+            float wireSpacing = 60.0f;
+            
+            // Check which wire's CUT button was clicked
+            for (size_t i = 0; i < wireColors.size(); i++) {
+                if (wireCut[i]) continue; // Skip already cut wires
+                
+                float y = wireStartY + i * wireSpacing;
+                float btnX = 620.0f;
+                float btnY = y - 5.0f;
+                
+                if (mouseX >= btnX && mouseX <= btnX + 60.0f &&
+                    mouseY >= btnY && mouseY <= btnY + 35.0f) {
+                    cutWire(i);
+                    return;
+                }
+            }
+        }
+    }
+}
+
+void WirePuzzle::update(float deltaTime) {
+    // No animation needed
+}
+
+void WirePuzzle::setFont(const sf::Font& f) {
+    font = f;
+}
+
+void WirePuzzle::setBoltCutters(bool has) {
+    hasBoltCutters = has;
+}
+
+void WirePuzzle::cutWire(int wireIndex) {
+    if (wireIndex >= 0 && wireIndex < (int)wireColors.size() && !wireCut[wireIndex]) {
+        wireCut[wireIndex] = true;
+        cutSequence.push_back(wireColors[wireIndex]);
+        
+        // Check if puzzle is solved after cutting
+        solve("");
+    }
+}
+
+sf::Color WirePuzzle::getWireColor(const std::string& colorName) {
+    if (colorName == "Red") return sf::Color(255, 50, 50);
+    if (colorName == "Yellow") return sf::Color(255, 255, 50);
+    if (colorName == "Blue") return sf::Color(50, 50, 255);
+    if (colorName == "Green") return sf::Color(50, 255, 50);
+    if (colorName == "Purple") return sf::Color(200, 50, 200);
+    return sf::Color::White;
 }

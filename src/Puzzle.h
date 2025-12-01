@@ -3,6 +3,7 @@
 
 #include <SFML/Graphics.hpp>
 #include <string>
+#include <vector>
 
 // Abstract base class for all puzzles
 class Puzzle {
@@ -12,6 +13,10 @@ protected:
     std::string hint;
     int timeBonus; // Time bonus for solving
     int timePenalty; // Time penalty for failing
+    std::optional<sf::Sprite> worldSprite; 
+    
+    // === NEW: Store position here until sprite is created ===
+    sf::Vector2f storedPosition;
     
 public:
     // Constructor
@@ -33,6 +38,11 @@ public:
     int getTimeBonus() const;
     int getTimePenalty() const;
     void setSolved(bool status);
+
+    void setPosition(float x, float y);
+    void setWorldTexture(const sf::Texture& texture);
+    void drawWorldSprite(sf::RenderWindow& window);
+    bool checkCollision(const sf::FloatRect& bounds) const;
 };
 
 // Riddle Puzzle - Answer a logic riddle
@@ -106,6 +116,63 @@ public:
     void addDigit(char digit);
     void removeDigit();
     void clearCode();
+};
+
+// ============================================================================
+// PHASE 2: NEW PUZZLES
+// ============================================================================
+
+// Math Puzzle - Solve a simple equation
+class MathPuzzle : public Puzzle {
+private:
+    std::string equation;
+    std::string correctAnswer;
+    std::string playerAnswer;
+    sf::Font defaultFont;
+    sf::Font font;
+    sf::Text equationText;
+    sf::Text answerDisplay;
+    int maxDigits;
+    
+public:
+    MathPuzzle(const std::string& eq, const std::string& answer);
+    
+    bool solve(const std::string& answer) override;
+    void display(sf::RenderWindow& window) override;
+    void handleInput(sf::Event& event) override;
+    void update(float deltaTime) override;
+    
+    void setFont(const sf::Font& f);
+    void addDigit(char digit);
+    void removeDigit();
+    void clearAnswer();
+};
+
+// Wire Puzzle - Cut wires in correct sequence
+class WirePuzzle : public Puzzle {
+private:
+    std::vector<std::string> wireColors; // {"Red", "Yellow", "Blue", "Green", "Purple"}
+    std::vector<std::string> correctSequence;
+    std::vector<std::string> cutSequence;
+    std::vector<bool> wireCut;
+    sf::Font defaultFont;
+    sf::Font font;
+    sf::Text instructionText;
+    std::vector<sf::RectangleShape> wires;
+    bool hasBoltCutters;
+    
+public:
+    WirePuzzle(const std::vector<std::string>& sequence);
+    
+    bool solve(const std::string& answer) override;
+    void display(sf::RenderWindow& window) override;
+    void handleInput(sf::Event& event) override;
+    void update(float deltaTime) override;
+    
+    void setFont(const sf::Font& f);
+    void setBoltCutters(bool has);
+    void cutWire(int wireIndex);
+    sf::Color getWireColor(const std::string& colorName);
 };
 
 #endif // PUZZLE_H
