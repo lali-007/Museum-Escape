@@ -40,7 +40,7 @@ void Game::initialize() {
     player = std::make_unique<Player>(148.0f, 289.0f, playerTexture);
     
     // Create timer (10 minutes = 600 seconds)
-    gameTimer = std::make_unique<Timer>(600.0f);
+    gameTimer = std::make_unique<Timer>(150.0f);
     gameTimer->setDisplayPosition(650.0f, 20.0f);
     gameTimer->setFont(mainFont);
     
@@ -358,8 +358,8 @@ void Game::setupPuzzles() {
     rooms[2]->addPuzzle(patternPuzzle);
     
     auto riddle = std::make_shared<RiddlePuzzle>(
-        "I speak without a mouth and hear without ears.\nI have no body, but come alive with wind.\nWhat am I?",
-        "echo"
+        "I am an odd number.\nTake away a letter and I become even.\nWhat am I?",
+        "Seven"
     );
     riddle->setFont(mainFont);
     riddle->setPosition(13.0f, 456.0f);
@@ -372,7 +372,7 @@ void Game::setupPuzzles() {
     lockPuzzle->setWorldTexture(lockTexture);
     rooms[4]->addPuzzle(lockPuzzle);
     
-    auto mathPuzzle = std::make_shared<MathPuzzle>("(60 - 12) = ?", "048");
+    auto mathPuzzle = std::make_shared<MathPuzzle>("(256/16 + 84) = ?", "100");
     mathPuzzle->setFont(mainFont);
     mathPuzzle->setPosition(57.0f, 203.0f);
     mathPuzzle->setWorldTexture(mathTexture);
@@ -466,45 +466,51 @@ void Game::handlePlayingInput(const sf::Event& event) {
 
 // Handle puzzle input
 void Game::handlePuzzleInput(const sf::Event& event) {
-    if (activePuzzle) {
-        bool wasSolved = activePuzzle->isSolvedStatus();
+    if (!activePuzzle) return;
+    
+    activePuzzle->handleInput(const_cast<sf::Event&>(event));
+    
+    // Check using the new flag
+    if (activePuzzle->wasJustSolved()) {
+        std::cout << "\n╔═══════════════════════════════════════╗" << std::endl;
+        std::cout << "║   PUZZLE JUST SOLVED - KEY SPAWNING  ║" << std::endl;
+        std::cout << "╚═══════════════════════════════════════╝\n" << std::endl;
         
-        activePuzzle->handleInput(const_cast<sf::Event&>(event));
+        gameTimer->addTime(activePuzzle->getTimeBonus());
+        showNotification("Puzzle Solved! +" + std::to_string(activePuzzle->getTimeBonus()) + "s", sf::Color::Green, 3.0f);
         
-        // Check if puzzle was just solved
-        if (!wasSolved && activePuzzle->isSolvedStatus()) {
-            gameTimer->addTime(activePuzzle->getTimeBonus());
-            showNotification("Puzzle Solved! +" + std::to_string(activePuzzle->getTimeBonus()) + "s", sf::Color::Green, 3.0f);
-            
-            if (currentRoomID == 2) {
-                // Pass keyTexture
-                auto blueCard = std::make_shared<Key>("Blue key", "blue_key", 650.0f, 500.0f, keyTexture); 
-                rooms[2]->addItem(blueCard);
-                // ...
-            } else if (currentRoomID == 4) {
-                // Pass keyTexture
-                auto yellowCard = std::make_shared<Key>("Yellow key", "yellow_key", 650.0f, 500.0f, keyTexture);
-                rooms[4]->addItem(yellowCard);
-                // ...
-            } else if (currentRoomID == 5) {
-                // Pass keyTexture
-                auto greenCard = std::make_shared<Key>("Green key", "green_key", 650.0f, 500.0f, keyTexture);
-                rooms[5]->addItem(greenCard);
-                // ...
-            } else if (currentRoomID == 6) {
-                // Pass keyTexture
-                auto masterCard = std::make_shared<Key>("Master key", "master_key", 650.0f, 500.0f, keyTexture);
-                rooms[6]->addItem(masterCard);
-                // ...
-            }
+        // Spawn keys
+        if (currentRoomID == 2) {
+            std::cout << "→ Spawning Blue Key" << std::endl;
+            rooms[2]->addItem(std::make_shared<Key>("Blue key", "blue_key", 650.0f, 500.0f, keyTexture));
+            showNotification("Blue Key appeared!", sf::Color::Cyan, 3.0f);
+        } 
+        else if (currentRoomID == 4) {
+            std::cout << "→ Spawning Yellow Key" << std::endl;
+            rooms[4]->addItem(std::make_shared<Key>("Yellow key", "yellow_key", 650.0f, 500.0f, keyTexture));
+            showNotification("Yellow Key appeared!", sf::Color::Cyan, 3.0f);
+        } 
+        else if (currentRoomID == 5) {
+            std::cout << "→ SPAWNING GREEN KEY IN ROOM 5!" << std::endl;
+            rooms[5]->addItem(std::make_shared<Key>("Green key", "green_key", 650.0f, 500.0f, keyTexture));
+            showNotification("Green Key appeared!", sf::Color::Cyan, 3.0f);
+        } 
+        else if (currentRoomID == 6) {
+            std::cout << "→ Spawning Master Key" << std::endl;
+            rooms[6]->addItem(std::make_shared<Key>("Master key", "master_key", 650.0f, 500.0f, keyTexture));
+            showNotification("Master Key appeared!", sf::Color::Cyan, 3.0f);
         }
+        
+        currentState = GameState::PLAYING;
+        activePuzzle = nullptr;
+        return;
     }
     
+    // Handle ESC
     if (const auto* keyPressed = event.getIf<sf::Event::KeyPressed>()) {
         if (keyPressed->code == sf::Keyboard::Key::Escape) {
-            activePuzzle = nullptr;
             currentState = GameState::PLAYING;
-            gameTimer->resume();
+            activePuzzle = nullptr;
         }
     }
 }
@@ -564,7 +570,23 @@ void Game::updatePlaying() {
 }
 
 void Game::updatePuzzle() {
-    if (activePuzzle) activePuzzle->update(deltaTime);
+    // Update timer during puzzle (keeps running)
+    gameTimer->update(deltaTime);
+    
+    // Update notification timer
+    if (notificationTimer > 0) {
+        notificationTimer -= deltaTime;
+    }
+    
+    // Update the puzzle itself
+    if (activePuzzle) {
+        activePuzzle->update(deltaTime);
+    }
+    
+    // Check if timer expired
+    if (gameTimer->isExpired()) {
+        setGameOver(false);
+    }
 }
 
 void Game::updateGameOver() {}
@@ -718,7 +740,6 @@ void Game::showStoryText(int roomID) {
 void Game::activatePuzzle(std::shared_ptr<Puzzle> puzzle) {
     activePuzzle = puzzle;
     currentState = GameState::PUZZLE_ACTIVE;
-    gameTimer->pause();
 }
 
 void Game::checkCollisions() {
@@ -790,7 +811,7 @@ void Game::checkDoorInteraction() {
                 
                 if (hasKey) {
                     door->unlock();
-                    rooms[currentRoomID]->forceSolvedBackground();
+                    rooms[currentRoomID]->revealSolvedBackground();
                     showNotification("Door unlocked with " + requiredKey + "!", sf::Color::Green, 2.0f);
                     std::cout << "Door unlocked with " << requiredKey << "!" << std::endl;
                     if (targetRoom == 999) {
@@ -832,19 +853,19 @@ void Game::checkItemPickup() {
             std::string name = item->getName();
             
             if (name == "Blue key") {
-                rooms[2]->forceSolvedBackground(); // Open Room 2 Door
+                rooms[2]->revealSolvedBackground(); // Open Room 2 Door
                 showNotification("Blue Key collected! Door Opened.", sf::Color::Green);
             }
             else if (name == "Yellow key") {
-                rooms[4]->forceSolvedBackground(); // Open Room 4 Door
+                rooms[4]->revealSolvedBackground(); // Open Room 4 Door
                 showNotification("Yellow Key collected! Door Opened.", sf::Color::Green);
             }
             else if (name == "Green key") {
-                rooms[5]->forceSolvedBackground(); // Open Room 5 Door
+                rooms[5]->revealSolvedBackground(); // Open Room 5 Door
                 showNotification("Green Key collected! Door Opened.", sf::Color::Green);
             }
             else if (name == "Master key") {
-                rooms[6]->forceSolvedBackground(); // Open Room 6 Door
+                rooms[6]->revealSolvedBackground(); // Open Room 6 Door
                 showNotification("Master Key collected! Door Opened.", sf::Color::Green);
             }
 
@@ -874,30 +895,6 @@ void Game::checkItemPickup() {
     }
 }
 
-// void Game::checkPuzzleInteraction() {
-//     auto& puzzles = rooms[currentRoomID]->getPuzzles();
-    
-//     for (auto& puzzle : puzzles) {
-//         if (!puzzle->isSolvedStatus()) {
-//             // Special handling for Wire Puzzle - need bolt cutters
-//             if (currentRoomID == 6) {
-//                 WirePuzzle* wirePuzzle = dynamic_cast<WirePuzzle*>(puzzle.get());
-//                 if (wirePuzzle) {
-//                     if (!inventory->hasTool("bolt_cutters")) {
-//                         showNotification("Need Bolt Cutters to cut wires!", sf::Color::Red, 3.0f);
-//                         std::cout << "Wire Puzzle requires Bolt Cutters!" << std::endl;
-//                         return;
-//                     }
-//                     wirePuzzle->setBoltCutters(true);
-//                 }
-//             }
-            
-//             activatePuzzle(puzzle);
-//             showNotification("Puzzle activated! Press ESC to close", sf::Color::Magenta, 2.0f);
-//             return;
-//         }
-//     }
-// }
 
 void Game::checkWinCondition() { 
     // if (inventory->hasItem("Evidence File")) setGameOver(true); 
@@ -923,7 +920,7 @@ void Game::resetGame() {
     player = std::make_unique<Player>(148.0f, 289.0f, playerTexture);
     
     // 4. Reset Timer
-    gameTimer = std::make_unique<Timer>(600.0f);
+    gameTimer = std::make_unique<Timer>(150.0f);
     gameTimer->setDisplayPosition(650.0f, 20.0f);
     gameTimer->setFont(mainFont);
     
