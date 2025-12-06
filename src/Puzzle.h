@@ -13,6 +13,7 @@ protected:
     std::string hint;
     int timeBonus; // Time bonus for solving
     int timePenalty; // Time penalty for failing
+    bool justSolved;
     std::optional<sf::Sprite> worldSprite; 
     
     // === NEW: Store position here until sprite is created ===
@@ -33,6 +34,7 @@ public:
     
     // Common functions
     bool isSolvedStatus() const;
+    bool wasJustSolved();
     std::string getDescription() const;
     std::string getHint() const;
     int getTimeBonus() const;
@@ -160,6 +162,7 @@ private:
     sf::Text instructionText;
     std::vector<sf::RectangleShape> wires;
     bool hasBoltCutters;
+    bool showWrongFeedback; // <--- ADD THIS LINE
     
 public:
     WirePuzzle(const std::vector<std::string>& sequence);
@@ -172,6 +175,7 @@ public:
     void setFont(const sf::Font& f);
     void setBoltCutters(bool has);
     void cutWire(int wireIndex);
+    void resetPuzzle(); // <--- ADD THIS LINE
     sf::Color getWireColor(const std::string& colorName);
 };
 

@@ -27,7 +27,7 @@ private:
     
 public:
     // Constructor
-    Timer(float totalSeconds = 600.0f); // Default 10 minutes
+    Timer(float totalSeconds = 150.0f); // Default 10 minutes
     
     // Timer controls
     void start();

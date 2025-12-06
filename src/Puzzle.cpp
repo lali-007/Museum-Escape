@@ -5,6 +5,7 @@
 
 #include "Puzzle.h"
 #include <algorithm>
+#include <iostream>
 #include <cctype>
 
 // Puzzle Base Class
@@ -14,6 +15,7 @@ Puzzle::Puzzle(const std::string& desc, const std::string& hintText, int bonus, 
       hint(hintText), 
       timeBonus(bonus), 
       timePenalty(penalty),
+      justSolved(false),
       storedPosition({0.f, 0.f}) // Initialize default position
 {
     // worldSprite is left empty (std::nullopt) here, preventing the error
@@ -25,6 +27,14 @@ std::string Puzzle::getHint() const { return hint; }
 int Puzzle::getTimeBonus() const { return timeBonus; }
 int Puzzle::getTimePenalty() const { return timePenalty; }
 void Puzzle::setSolved(bool status) { isSolved = status; }
+
+bool Puzzle::wasJustSolved() {
+    if (justSolved) {
+        justSolved = false; // Reset after reading
+        return true;
+    }
+    return false;
+}
 
 void Puzzle::setPosition(float x, float y) {
     storedPosition = {x, y};
@@ -364,7 +374,7 @@ bool PatternPuzzle::checkPattern() {
             return false;
         }
     }
-    
+    justSolved = true;
     return true;
 }
 
@@ -387,6 +397,7 @@ LockPuzzle::LockPuzzle(const std::string& code)
 bool LockPuzzle::solve(const std::string& answer) {
     if (enteredCode == correctCode) {
         isSolved = true;
+        justSolved = true;
         return true;
     }
     return false;
@@ -671,22 +682,30 @@ void LockPuzzle::clearCode() {
 // ============================================================================
 
 MathPuzzle::MathPuzzle(const std::string& eq, const std::string& answer)
-    : Puzzle("Solve the equation to unlock the safe", "Check the equation carefully", 35, 10),
-      equation(eq), correctAnswer(answer), maxDigits(3),
-      equationText(defaultFont), answerDisplay(defaultFont) {
+    : Puzzle("Solve the equation", "Basic math...", 30, 10),
+      equation(eq),
+      correctAnswer(answer),
+      equationText(defaultFont),
+      answerDisplay(defaultFont),
+      maxDigits(3) {
     
-    playerAnswer = "";
-    
+    equationText.setString(equation);
     equationText.setCharacterSize(32);
     equationText.setFillColor(sf::Color::White);
     
+    answerDisplay.setString("");
     answerDisplay.setCharacterSize(28);
     answerDisplay.setFillColor(sf::Color::Cyan);
 }
 
 bool MathPuzzle::solve(const std::string& answer) {
+    std::cout << "\n>>> MathPuzzle::solve() called <<<" << std::endl;
+    std::cout << "Player answer: '" << playerAnswer << "'" << std::endl;
+    std::cout << "Correct answer: '" << correctAnswer << "'" << std::endl;    
     if (playerAnswer == correctAnswer) {
         isSolved = true;
+        justSolved = true; // <--- ADD THIS
+        std::cout << "Setting isSolved = true AND justSolved = true" << std::endl;
         return true;
     }
     return false;
@@ -698,240 +717,258 @@ void MathPuzzle::display(sf::RenderWindow& window) {
     overlay.setFillColor(sf::Color(0, 0, 0, 180));
     window.draw(overlay);
     
-    // Puzzle box
-    sf::RectangleShape puzzleBox({600.0f, 500.0f});
-    puzzleBox.setPosition({100.0f, 50.0f});
-    puzzleBox.setFillColor(sf::Color(40, 40, 60));
-    puzzleBox.setOutlineThickness(3.0f);
-    puzzleBox.setOutlineColor(sf::Color::Cyan);
-    window.draw(puzzleBox);
+    // Background - SMALLER
+    sf::RectangleShape background({500.0f, 480.0f});
+    background.setPosition({150.0f, 60.0f});
+    background.setFillColor(sf::Color(30, 30, 40, 240));
+    background.setOutlineThickness(3.0f);
+    background.setOutlineColor(sf::Color::Cyan);
+    window.draw(background);
     
     // Title
     sf::Text title(font);
     title.setString("MATH PUZZLE - SAFE LOCK");
-    title.setCharacterSize(26);
+    title.setCharacterSize(24);
     title.setFillColor(sf::Color::Cyan);
-    title.setPosition({220.0f, 70.0f});
+    title.setPosition({230.0f, 75.0f});
     window.draw(title);
     
     // Instructions
     sf::Text instructions(font);
     instructions.setString("Solve the equation to unlock the safe:");
-    instructions.setCharacterSize(18);
+    instructions.setCharacterSize(16);
     instructions.setFillColor(sf::Color::White);
-    instructions.setPosition({200.0f, 120.0f});
+    instructions.setPosition({200.0f, 110.0f});
     window.draw(instructions);
     
-    // Equation display
+    // Draw equation text - BIGGER
     equationText.setFont(font);
-    equationText.setString(equation);
-    equationText.setPosition({300.0f, 180.0f});
+    equationText.setCharacterSize(36);
+    equationText.setPosition({310.0f, 145.0f});
     window.draw(equationText);
     
-    // Answer label
-    sf::Text answerLabel(font);
-    answerLabel.setString("Enter 3-digit answer:");
-    answerLabel.setCharacterSize(20);
-    answerLabel.setFillColor(sf::Color::White);
-    answerLabel.setPosition({250.0f, 250.0f});
-    window.draw(answerLabel);
-    
-    // Answer input box
-    sf::RectangleShape answerBox({200.0f, 50.0f});
-    answerBox.setPosition({300.0f, 290.0f});
-    answerBox.setFillColor(sf::Color(20, 20, 30));
-    answerBox.setOutlineThickness(3.0f);
+    // Answer display box
+    sf::RectangleShape answerBox({180.0f, 45.0f});
+    answerBox.setPosition({310.0f, 200.0f});
+    answerBox.setFillColor(sf::Color::Transparent);
+    answerBox.setOutlineThickness(2.0f);
     answerBox.setOutlineColor(sf::Color::Cyan);
     window.draw(answerBox);
     
-    // Display entered answer with underscores
-    std::string displayAnswer = "";
-    for (size_t i = 0; i < playerAnswer.length(); i++) {
-        displayAnswer += playerAnswer[i];
-        displayAnswer += " ";
-    }
-    for (size_t i = playerAnswer.length(); i < (size_t)maxDigits; i++) {
-        displayAnswer += "_ ";
-    }
-    
+    // Draw player's answer
     answerDisplay.setFont(font);
-    answerDisplay.setString(displayAnswer);
-    answerDisplay.setPosition({330.0f, 300.0f});
+    answerDisplay.setString(playerAnswer.empty() ? "_ _ _" : playerAnswer);
+    answerDisplay.setCharacterSize(26);
+    answerDisplay.setPosition({345.0f, 208.0f});
     window.draw(answerDisplay);
     
-    // Numeric keypad (simplified 3x3 + bottom row)
-    float keypadX = 250.0f;
-    float keypadY = 360.0f;
-    float buttonSize = 60.0f;
-    float spacing = 80.0f;
+    // Create number pad buttons - SMALLER & MORE COMPACT
+    float buttonSize = 50.0f;
+    float spacing = 8.0f;
+    float startX = 310.0f;
+    float startY = 260.0f;
     
-    // Draw 1-9 buttons
-    for (int i = 1; i <= 9; i++) {
-        int row = (i - 1) / 3;
-        int col = (i - 1) % 3;
-        
-        float x = keypadX + col * spacing;
-        float y = keypadY + row * spacing;
+    // Buttons 1-9 in 3x3 grid
+    for (int i = 0; i < 9; i++) {
+        int row = i / 3;
+        int col = i % 3;
         
         sf::RectangleShape button({buttonSize, buttonSize});
-        button.setPosition({x, y});
-        button.setFillColor(sf::Color(60, 60, 80));
+        button.setPosition({
+            startX + col * (buttonSize + spacing),
+            startY + row * (buttonSize + spacing)
+        });
+        button.setFillColor(sf::Color(60, 60, 70));
         button.setOutlineThickness(2.0f);
         button.setOutlineColor(sf::Color::White);
         window.draw(button);
         
         sf::Text num(font);
-        num.setString(std::to_string(i));
-        num.setCharacterSize(24);
+        num.setString(std::to_string(i + 1));
+        num.setCharacterSize(22);
         num.setFillColor(sf::Color::White);
-        num.setPosition({x + 22.0f, y + 15.0f});
+        
+        // Center text in button
+        sf::FloatRect textBounds = num.getLocalBounds();
+        num.setPosition({
+            startX + col * (buttonSize + spacing) + (buttonSize - textBounds.size.x) / 2.0f - textBounds.position.x,
+            startY + row * (buttonSize + spacing) + (buttonSize - textBounds.size.y) / 2.0f - textBounds.position.y - 5.0f
+        });
         window.draw(num);
     }
     
-    // Bottom row: Clear, 0, Submit
-    // Clear button
-    sf::RectangleShape clearBtn({buttonSize, buttonSize});
-    clearBtn.setPosition({keypadX, keypadY + 3 * spacing});
-    clearBtn.setFillColor(sf::Color(100, 50, 50));
-    clearBtn.setOutlineThickness(2.0f);
-    clearBtn.setOutlineColor(sf::Color::White);
-    window.draw(clearBtn);
+    // Button 0 (left bottom)
+    sf::RectangleShape zeroButton({buttonSize, buttonSize});
+    zeroButton.setPosition({
+        startX,
+        startY + 3 * (buttonSize + spacing)
+    });
+    zeroButton.setFillColor(sf::Color(60, 60, 70));
+    zeroButton.setOutlineThickness(2.0f);
+    zeroButton.setOutlineColor(sf::Color::White);
+    window.draw(zeroButton);
+    
+    sf::Text zero(font);
+    zero.setString("0");
+    zero.setCharacterSize(22);
+    zero.setFillColor(sf::Color::White);
+    sf::FloatRect zeroBounds = zero.getLocalBounds();
+    zero.setPosition({
+        startX + (buttonSize - zeroBounds.size.x) / 2.0f - zeroBounds.position.x,
+        startY + 3 * (buttonSize + spacing) + (buttonSize - zeroBounds.size.y) / 2.0f - zeroBounds.position.y - 5.0f
+    });
+    window.draw(zero);
+    
+    // Clear button (middle bottom)
+    sf::RectangleShape clearButton({buttonSize, buttonSize});
+    clearButton.setPosition({
+        startX + 1 * (buttonSize + spacing),
+        startY + 3 * (buttonSize + spacing)
+    });
+    clearButton.setFillColor(sf::Color(80, 40, 40));
+    clearButton.setOutlineThickness(2.0f);
+    clearButton.setOutlineColor(sf::Color::Red);
+    window.draw(clearButton);
     
     sf::Text clearText(font);
-    clearText.setString("C");
-    clearText.setCharacterSize(22);
+    clearText.setString("CLR");
+    clearText.setCharacterSize(16);
     clearText.setFillColor(sf::Color::White);
-    clearText.setPosition({keypadX + 22.0f, keypadY + 3 * spacing + 16.0f});
+    sf::FloatRect clearBounds = clearText.getLocalBounds();
+    clearText.setPosition({
+        startX + 1 * (buttonSize + spacing) + (buttonSize - clearBounds.size.x) / 2.0f,
+        startY + 3 * (buttonSize + spacing) + 15.0f
+    });
     window.draw(clearText);
     
-    // 0 button
-    sf::RectangleShape zeroBtn({buttonSize, buttonSize});
-    zeroBtn.setPosition({keypadX + spacing, keypadY + 3 * spacing});
-    zeroBtn.setFillColor(sf::Color(60, 60, 80));
-    zeroBtn.setOutlineThickness(2.0f);
-    zeroBtn.setOutlineColor(sf::Color::White);
-    window.draw(zeroBtn);
-    
-    sf::Text zeroText(font);
-    zeroText.setString("0");
-    zeroText.setCharacterSize(24);
-    zeroText.setFillColor(sf::Color::White);
-    zeroText.setPosition({keypadX + spacing + 22.0f, keypadY + 3 * spacing + 15.0f});
-    window.draw(zeroText);
-    
-    // Submit button
-    sf::RectangleShape submitBtn({buttonSize, buttonSize});
-    submitBtn.setPosition({keypadX + 2 * spacing, keypadY + 3 * spacing});
-    submitBtn.setFillColor(sf::Color(50, 100, 50));
-    submitBtn.setOutlineThickness(2.0f);
-    submitBtn.setOutlineColor(sf::Color::White);
-    window.draw(submitBtn);
+    // Submit button (right bottom)
+    sf::RectangleShape submitButton({buttonSize, buttonSize});
+    submitButton.setPosition({
+        startX + 2 * (buttonSize + spacing),
+        startY + 3 * (buttonSize + spacing)
+    });
+    submitButton.setFillColor(sf::Color(40, 80, 40));
+    submitButton.setOutlineThickness(2.0f);
+    submitButton.setOutlineColor(sf::Color::Green);
+    window.draw(submitButton);
     
     sf::Text submitText(font);
     submitText.setString("OK");
-    submitText.setCharacterSize(20);
+    submitText.setCharacterSize(18);
     submitText.setFillColor(sf::Color::White);
-    submitText.setPosition({keypadX + 2 * spacing + 16.0f, keypadY + 3 * spacing + 18.0f});
+    sf::FloatRect submitBounds = submitText.getLocalBounds();
+    submitText.setPosition({
+        startX + 2 * (buttonSize + spacing) + (buttonSize - submitBounds.size.x) / 2.0f,
+        startY + 3 * (buttonSize + spacing) + 13.0f
+    });
     window.draw(submitText);
     
-    // Feedback
+    // Feedback message
     if (isSolved) {
         sf::Text feedback(font);
-        feedback.setString("Correct! Safe unlocked! +" + std::to_string(timeBonus) + " seconds!");
-        feedback.setCharacterSize(18);
+        feedback.setString("Correct! +" + std::to_string(timeBonus) + "s");
+        feedback.setCharacterSize(16);
         feedback.setFillColor(sf::Color::Green);
-        feedback.setPosition({200.0f, 520.0f});
+        feedback.setPosition({310.0f, 495.0f});
+        window.draw(feedback);
+    } else if (playerAnswer.length() == maxDigits && !solve("") && !isSolved) {
+        sf::Text feedback(font);
+        feedback.setString("Wrong! -" + std::to_string(timePenalty) + "s");
+        feedback.setCharacterSize(16);
+        feedback.setFillColor(sf::Color::Red);
+        feedback.setPosition({320.0f, 495.0f});
         window.draw(feedback);
     }
     
-    // Instructions
+    // Controls
     sf::Text controls(font);
-    controls.setString("Click keypad or use keyboard | ESC to exit");
-    controls.setCharacterSize(14);
+    controls.setString("ESC to exit");
+    controls.setCharacterSize(12);
     controls.setFillColor(sf::Color(150, 150, 150));
-    controls.setPosition({220.0f, 540.0f});
+    controls.setPosition({350.0f, 520.0f});
     window.draw(controls);
 }
 
 void MathPuzzle::handleInput(sf::Event& event) {
     if (isSolved) return;
     
-    // Handle mouse clicks
     if (const auto* mousePressed = event.getIf<sf::Event::MouseButtonPressed>()) {
         if (mousePressed->button == sf::Mouse::Button::Left) {
             float mouseX = static_cast<float>(mousePressed->position.x);
             float mouseY = static_cast<float>(mousePressed->position.y);
             
-            float keypadX = 250.0f;
-            float keypadY = 360.0f;
-            float buttonSize = 60.0f;
-            float spacing = 80.0f;
+            float buttonSize = 50.0f;
+            float spacing = 8.0f;
+            float startX = 310.0f;
+            float startY = 260.0f;
             
-            // Check 1-9 buttons
-            for (int i = 1; i <= 9; i++) {
-                int row = (i - 1) / 3;
-                int col = (i - 1) % 3;
+            // Check number buttons 1-9
+            for (int i = 0; i < 9; i++) {
+                int row = i / 3;
+                int col = i % 3;
                 
-                float x = keypadX + col * spacing;
-                float y = keypadY + row * spacing;
+                float btnX = startX + col * (buttonSize + spacing);
+                float btnY = startY + row * (buttonSize + spacing);
                 
-                if (mouseX >= x && mouseX <= x + buttonSize &&
-                    mouseY >= y && mouseY <= y + buttonSize) {
-                    addDigit('0' + i);
+                if (mouseX >= btnX && mouseX <= btnX + buttonSize &&
+                    mouseY >= btnY && mouseY <= btnY + buttonSize) {
+                    addDigit('1' + i);
                     return;
                 }
             }
             
-            // Check Clear button
-            float clearX = keypadX;
-            float clearY = keypadY + 3 * spacing;
-            if (mouseX >= clearX && mouseX <= clearX + buttonSize &&
-                mouseY >= clearY && mouseY <= clearY + buttonSize) {
-                clearAnswer();
-                return;
-            }
-            
             // Check 0 button
-            float zeroX = keypadX + spacing;
-            float zeroY = keypadY + 3 * spacing;
-            if (mouseX >= zeroX && mouseX <= zeroX + buttonSize &&
-                mouseY >= zeroY && mouseY <= zeroY + buttonSize) {
+            float zero_x = startX;
+            float zero_y = startY + 3 * (buttonSize + spacing);
+            if (mouseX >= zero_x && mouseX <= zero_x + buttonSize &&
+                mouseY >= zero_y && mouseY <= zero_y + buttonSize) {
                 addDigit('0');
                 return;
             }
             
-            // Check Submit button
-            float submitX = keypadX + 2 * spacing;
-            float submitY = keypadY + 3 * spacing;
-            if (mouseX >= submitX && mouseX <= submitX + buttonSize &&
-                mouseY >= submitY && mouseY <= submitY + buttonSize) {
-                solve(playerAnswer);
+            // Check CLEAR button
+            float clear_x = startX + 1 * (buttonSize + spacing);
+            float clear_y = startY + 3 * (buttonSize + spacing);
+            if (mouseX >= clear_x && mouseX <= clear_x + buttonSize &&
+                mouseY >= clear_y && mouseY <= clear_y + buttonSize) {
+                clearAnswer();
+                return;
+            }
+            
+            // Check SUBMIT button
+            float submit_x = startX + 2 * (buttonSize + spacing);
+            float submit_y = startY + 3 * (buttonSize + spacing);
+            if (mouseX >= submit_x && mouseX <= submit_x + buttonSize &&
+                mouseY >= submit_y && mouseY <= submit_y + buttonSize) {
+                if (playerAnswer.length() == maxDigits) {
+                    solve(playerAnswer);
+                }
                 return;
             }
         }
     }
     
-    // Handle keyboard input
-    if (const auto* textEntered = event.getIf<sf::Event::TextEntered>()) {
-        char entered = static_cast<char>(textEntered->unicode);
-        
-        if (entered == 8) { // Backspace
-            removeDigit();
-        } else if (entered >= '0' && entered <= '9') {
-            addDigit(entered);
-        }
-    }
-    
-    // Handle Enter key
+    // Keyboard input (same as before)
     if (const auto* keyPressed = event.getIf<sf::Event::KeyPressed>()) {
-        if (keyPressed->code == sf::Keyboard::Key::Enter && playerAnswer.length() == (size_t)maxDigits) {
+        if (keyPressed->code >= sf::Keyboard::Key::Num0 && keyPressed->code <= sf::Keyboard::Key::Num9) {
+            int keyValue = static_cast<int>(keyPressed->code) - static_cast<int>(sf::Keyboard::Key::Num0);
+            addDigit('0' + keyValue);
+        } 
+        else if (keyPressed->code >= sf::Keyboard::Key::Numpad0 && keyPressed->code <= sf::Keyboard::Key::Numpad9) {
+            int keyValue = static_cast<int>(keyPressed->code) - static_cast<int>(sf::Keyboard::Key::Numpad0);
+            addDigit('0' + keyValue);
+        } 
+        else if (keyPressed->code == sf::Keyboard::Key::Backspace) {
+            removeDigit();
+        } 
+        else if (keyPressed->code == sf::Keyboard::Key::Enter && playerAnswer.length() == maxDigits) {
             solve(playerAnswer);
         }
     }
 }
 
 void MathPuzzle::update(float deltaTime) {
-    // No animation needed for math puzzle
+    // No animation needed
 }
 
 void MathPuzzle::setFont(const sf::Font& f) {
@@ -941,7 +978,7 @@ void MathPuzzle::setFont(const sf::Font& f) {
 }
 
 void MathPuzzle::addDigit(char digit) {
-    if (playerAnswer.length() < (size_t)maxDigits && digit >= '0' && digit <= '9') {
+    if (playerAnswer.length() < maxDigits && digit >= '0' && digit <= '9') {
         playerAnswer += digit;
     }
 }
@@ -958,32 +995,47 @@ void MathPuzzle::clearAnswer() {
 
 // Continue to Part 2 for WirePuzzle...
 // ============================================================================
-// Wire Puzzle Implementation
+// WirePuzzle - Cut wires in correct order (COMPLETE IMPLEMENTATION)
 // ============================================================================
 
 WirePuzzle::WirePuzzle(const std::vector<std::string>& sequence)
-    : Puzzle("Cut the wires in the correct sequence", "Primary colors first, then secondary", 40, 10),
-      correctSequence(sequence), hasBoltCutters(false),
-      instructionText(defaultFont) {
+    : Puzzle("Cut wires in correct order", "Think about wire hierarchy...", 50, 20),
+      correctSequence(sequence),
+      instructionText(defaultFont),
+      hasBoltCutters(false),
+      showWrongFeedback(false) {
     
     // Initialize wire colors
     wireColors = {"Red", "Yellow", "Blue", "Green", "Purple"};
     
-    // Initialize all wires as not cut
-    wireCut = {false, false, false, false, false};
+    // Initialize all wires as uncut
+    wireCut = std::vector<bool>(wireColors.size(), false);
     
-    // Create wire shapes
+    // Create wire shapes (visual representation)
+    float wireStartY = 180.0f;
+    float wireSpacing = 60.0f;
+    
     for (size_t i = 0; i < wireColors.size(); i++) {
         sf::RectangleShape wire({400.0f, 25.0f});
+        wire.setPosition({200.0f, wireStartY + i * wireSpacing});
+        wire.setFillColor(getWireColor(wireColors[i]));
         wires.push_back(wire);
     }
 }
 
 bool WirePuzzle::solve(const std::string& answer) {
-    // Check if cut sequence matches correct sequence
-    if (cutSequence == correctSequence) {
-        isSolved = true;
-        return true;
+    // Check if we've cut all required wires
+    if (cutSequence.size() == correctSequence.size()) {
+        if (cutSequence == correctSequence) {
+            isSolved = true;
+            justSolved = true;
+            showWrongFeedback = false;
+            return true;
+        } else {
+            // Wrong sequence - show feedback but allow retry
+            showWrongFeedback = true;
+            return false;
+        }
     }
     return false;
 }
@@ -1057,7 +1109,7 @@ void WirePuzzle::display(sf::RenderWindow& window) {
             wireRight.setFillColor(sf::Color(80, 80, 80));
             window.draw(wireRight);
             
-            // Cut mark (X)
+            // Cut mark (scissors symbol)
             sf::Text cutMark(font);
             cutMark.setString("✂");
             cutMark.setCharacterSize(30);
@@ -1077,8 +1129,8 @@ void WirePuzzle::display(sf::RenderWindow& window) {
         label.setPosition({100.0f, y + 2.0f});
         window.draw(label);
         
-        // Click button (if not cut and have bolt cutters)
-        if (!wireCut[i] && hasBoltCutters) {
+        // Click button (if not cut and have bolt cutters and not solved)
+        if (!wireCut[i] && hasBoltCutters && !isSolved) {
             sf::RectangleShape cutButton({60.0f, 35.0f});
             cutButton.setPosition({620.0f, y - 5.0f});
             cutButton.setFillColor(sf::Color(100, 50, 50));
@@ -1116,7 +1168,28 @@ void WirePuzzle::display(sf::RenderWindow& window) {
     sequenceDisplay.setPosition({100.0f, 510.0f});
     window.draw(sequenceDisplay);
     
-    // Feedback
+    // RESET BUTTON - Always visible when not solved
+    if (!isSolved && hasBoltCutters) {
+        sf::RectangleShape resetButton({100.0f, 40.0f});
+        resetButton.setPosition({450.0f, 475.0f});
+        resetButton.setFillColor(sf::Color(80, 60, 40));
+        resetButton.setOutlineThickness(2.0f);
+        resetButton.setOutlineColor(sf::Color::Yellow);
+        window.draw(resetButton);
+        
+        sf::Text resetText(font);
+        resetText.setString("RESET");
+        resetText.setCharacterSize(18);
+        resetText.setFillColor(sf::Color::White);
+        sf::FloatRect resetBounds = resetText.getLocalBounds();
+        resetText.setPosition({
+            475.0f - resetBounds.position.x,
+            485.0f - resetBounds.position.y
+        });
+        window.draw(resetText);
+    }
+    
+    // Feedback messages
     if (isSolved) {
         sf::Text feedback(font);
         feedback.setString("Success! Alarm disabled! +" + std::to_string(timeBonus) + " seconds!");
@@ -1124,33 +1197,48 @@ void WirePuzzle::display(sf::RenderWindow& window) {
         feedback.setFillColor(sf::Color::Green);
         feedback.setPosition({180.0f, 540.0f});
         window.draw(feedback);
-    } else if (cutSequence.size() > 0 && cutSequence.size() == correctSequence.size()) {
-        // Wrong sequence
+    } else if (showWrongFeedback) {
+        // Wrong sequence - allow retry
         sf::Text feedback(font);
-        feedback.setString("WRONG SEQUENCE! Alarm triggered! (Press ESC)");
-        feedback.setCharacterSize(18);
+        feedback.setString("WRONG SEQUENCE! -" + std::to_string(timePenalty) + "s. Press RESET (R) to try again.");
+        feedback.setCharacterSize(16);
         feedback.setFillColor(sf::Color::Red);
-        feedback.setPosition({160.0f, 540.0f});
+        feedback.setPosition({130.0f, 540.0f});
         window.draw(feedback);
     }
     
     // Controls
     sf::Text controls(font);
-    controls.setString("Click CUT buttons | ESC to exit");
+    controls.setString("Click CUT buttons | R to RESET | ESC to exit");
     controls.setCharacterSize(14);
     controls.setFillColor(sf::Color(150, 150, 150));
-    controls.setPosition({250.0f, 555.0f});
+    controls.setPosition({220.0f, 555.0f});
     window.draw(controls);
 }
 
 void WirePuzzle::handleInput(sf::Event& event) {
     if (isSolved || !hasBoltCutters) return;
     
-    // Handle mouse clicks on CUT buttons
+    // Handle keyboard R key for reset
+    if (const auto* keyPressed = event.getIf<sf::Event::KeyPressed>()) {
+        if (keyPressed->code == sf::Keyboard::Key::R) {
+            resetPuzzle();
+            return;
+        }
+    }
+    
+    // Handle mouse clicks
     if (const auto* mousePressed = event.getIf<sf::Event::MouseButtonPressed>()) {
         if (mousePressed->button == sf::Mouse::Button::Left) {
             float mouseX = static_cast<float>(mousePressed->position.x);
             float mouseY = static_cast<float>(mousePressed->position.y);
+            
+            // Check RESET button click
+            if (mouseX >= 450.0f && mouseX <= 550.0f &&
+                mouseY >= 475.0f && mouseY <= 515.0f) {
+                resetPuzzle();
+                return;
+            }
             
             float wireStartY = 180.0f;
             float wireSpacing = 60.0f;
@@ -1174,7 +1262,7 @@ void WirePuzzle::handleInput(sf::Event& event) {
 }
 
 void WirePuzzle::update(float deltaTime) {
-    // No animation needed
+    // No animation needed for this puzzle
 }
 
 void WirePuzzle::setFont(const sf::Font& f) {
@@ -1183,6 +1271,21 @@ void WirePuzzle::setFont(const sf::Font& f) {
 
 void WirePuzzle::setBoltCutters(bool has) {
     hasBoltCutters = has;
+}
+
+void WirePuzzle::resetPuzzle() {
+    // Reset all wires to uncut state
+    for (size_t i = 0; i < wireCut.size(); i++) {
+        wireCut[i] = false;
+    }
+    
+    // Clear the cut sequence
+    cutSequence.clear();
+    
+    // Hide wrong feedback
+    showWrongFeedback = false;
+    
+    // Don't reset isSolved - only successful completion sets it to true
 }
 
 void WirePuzzle::cutWire(int wireIndex) {
